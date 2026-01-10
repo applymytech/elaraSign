@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>elaraSign - Image Signing Service</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+    }
+    h1 { 
+      color: #00d4aa; 
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #888;
+      margin-bottom: 30px;
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .tab {
+      padding: 12px 24px;
+      background: #2a2a4e;
+      border: none;
+      color: #aaa;
+      cursor: pointer;
+      border-radius: 8px 8px 0 0;
+      font-size: 16px;
+    }
+    .tab.active {
+      background: #3a3a6e;
+      color: #00d4aa;
+    }
+    .panel {
+      display: none;
+      background: #2a2a4e;
+      padding: 30px;
+      border-radius: 0 8px 8px 8px;
+    }
+    .panel.active { display: block; }
+    
+    .drop-zone {
+      border: 2px dashed #555;
+      border-radius: 12px;
+      padding: 60px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 20px;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: #00d4aa;
+      background: rgba(0, 212, 170, 0.1);
+    }
+    .drop-zone p { margin: 10px 0; color: #888; }
+    .drop-zone .icon { font-size: 48px; margin-bottom: 10px; }
+    
+    input[type="file"] { display: none; }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      color: #aaa;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px;
+      background: #1a1a2e;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #fff;
+    }
+    
+    button.primary {
+      background: #00d4aa;
+      color: #1a1a2e;
+      border: none;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+    }
+    button.primary:hover { background: #00b894; }
+    button.primary:disabled {
+      background: #444;
+      color: #888;
+      cursor: not-allowed;
+    }
+    
+    .result {
+      margin-top: 20px;
+      padding: 20px;
+      background: #1a1a2e;
+      border-radius: 8px;
+      display: none;
+    }
+    .result.show { display: block; }
+    .result.success { border-left: 4px solid #00d4aa; }
+    .result.error { border-left: 4px solid #e74c3c; }
+    .result.warning { border-left: 4px solid #f39c12; }
+    
+    .result h3 { margin-top: 0; }
+    .result pre {
+      background: #0a0a1e;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 13px;
+    }
+    
+    .preview {
+      max-width: 300px;
+      max-height: 300px;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+    
+    .download-btn {
+      display: inline-block;
+      background: #3498db;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      text-decoration: none;
+      margin-top: 10px;
+    }
+    .download-btn:hover { background: #2980b9; }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .status-badge.signed { background: #00d4aa; color: #1a1a2e; }
+    .status-badge.unsigned { background: #e74c3c; color: white; }
+    .status-badge.tampered { background: #f39c12; color: #1a1a2e; }
+  </style>
+</head>
+<body>
+  <h1>🔐 elaraSign</h1>
+  <p class="subtitle">Embed provenance metadata into images & PDFs - invisible, resilient, verifiable</p>
+  
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('sign')">Sign File</button>
+    <button class="tab" onclick="showTab('verify')">Verify File</button>
+  </div>
+  
+  <!-- Sign Panel -->
+  <div id="sign-panel" class="panel active">
+    <div class="drop-zone" onclick="document.getElementById('sign-file').click()" 
+         ondragover="event.preventDefault(); this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="handleDrop(event, 'sign')">
+      <div class="icon">📤</div>
+      <p><strong>Drop file here</strong> or click to browse</p>
+      <p>PNG, JPG, WebP, GIF, TIFF, PDF • Max 50MB</p>
+    </div>
+    <input type="file" id="sign-file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/tiff,application/pdf" onchange="handleFileSelect(this, 'sign')">
+    
+    <div class="form-group">
+      <label>Generator (optional)</label>
+      <input type="text" id="generator" placeholder="e.g., stable-diffusion, midjourney">
+    </div>
+    <div class="form-group">
+      <label>Model (optional)</label>
+      <input type="text" id="model" placeholder="e.g., SDXL, FLUX.1">
+    </div>
+    <div class="form-group">
+      <label>Prompt (optional)</label>
+      <input type="text" id="prompt" placeholder="The generation prompt">
+    </div>
+    
+    <button class="primary" id="sign-btn" onclick="signFile()" disabled>Sign File</button>
+    
+    <div id="sign-result" class="result"></div>
+  </div>
+  
+  <!-- Verify Panel -->
+  <div id="verify-panel" class="panel">
+    <div class="drop-zone" onclick="document.getElementById('verify-file').click()"
+         ondragover="event.preventDefault(); this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="handleDrop(event, 'verify')">
+      <div class="icon">🔍</div>
+      <p><strong>Drop file here</strong> or click to browse</p>
+      <p>Check if file has elaraSign signature</p>
+    </div>
+    <input type="file" id="verify-file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/tiff,application/pdf" onchange="handleFileSelect(this, 'verify')">
+    
+    <button class="primary" id="verify-btn" onclick="verifyFile()" disabled>Verify File</button>
+    
+    <div id="verify-result" class="result"></div>
+  </div>
+  
+  <script>
+    let signFileData = null;
+    let verifyFileData = null;
+    
+    // Supported file types
+    const SIGN_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff', 'application/pdf'];
+    const VERIFY_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff', 'application/pdf'];
+    
+    function showTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelector(`.tab:nth-child(${tab === 'sign' ? 1 : 2})`).classList.add('active');
+      document.getElementById(`${tab}-panel`).classList.add('active');
+    }
+    
+    function isValidType(file, allowedTypes) {
+      return allowedTypes.includes(file.type) || file.name.toLowerCase().endsWith('.pdf');
+    }
+    
+    function handleDrop(e, type) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      const allowedTypes = type === 'sign' ? SIGN_TYPES : VERIFY_TYPES;
+      
+      if (file && isValidType(file, allowedTypes)) {
+        if (type === 'sign') {
+          signFileData = file;
+          document.getElementById('sign-btn').disabled = false;
+        } else {
+          verifyFileData = file;
+          document.getElementById('verify-btn').disabled = false;
+        }
+        const icon = file.type === 'application/pdf' ? '📄' : '🖼️';
+        e.currentTarget.innerHTML = `<div class="icon">${icon}</div><p><strong>${file.name}</strong></p><p>${(file.size / 1024).toFixed(1)} KB</p>`;
+      } else {
+        e.currentTarget.innerHTML = `<div class="icon">❌</div><p><strong>Unsupported format</strong></p><p>Use PNG, JPG, WebP, GIF, TIFF, or PDF</p>`;
+      }
+    }
+    
+    function handleFileSelect(input, type) {
+      const file = input.files[0];
+      if (file) {
+        if (type === 'sign') {
+          signFileData = file;
+          document.getElementById('sign-btn').disabled = false;
+        } else {
+          verifyFileData = file;
+          document.getElementById('verify-btn').disabled = false;
+        }
+        const icon = file.type === 'application/pdf' ? '📄' : '🖼️';
+        input.previousElementSibling.innerHTML = `<div class="icon">${icon}</div><p><strong>${file.name}</strong></p><p>${(file.size / 1024).toFixed(1)} KB</p>`;
+      }
+    }
+    
+    async function signFile() {
+      if (!signFileData) return;
+      
+      const btn = document.getElementById('sign-btn');
+      const result = document.getElementById('sign-result');
+      btn.disabled = true;
+      btn.textContent = 'Signing...';
+      
+      const formData = new FormData();
+      formData.append('file', signFileData);
+      formData.append('generator', document.getElementById('generator').value || 'elara.sign.web');
+      formData.append('model', document.getElementById('model').value);
+      formData.append('prompt', document.getElementById('prompt').value);
+      
+      try {
+        const res = await fetch('/api/sign', { method: 'POST', body: formData });
+        const data = await res.json();
+        
+        if (data.success) {
+          const isPdf = signFileData.type === 'application/pdf';
+          const fileType = isPdf ? 'PDF' : 'Image';
+          result.className = 'result show success';
+          result.innerHTML = `
+            <h3>✅ ${fileType} Signed Successfully</h3>
+            <p><strong>Meta Hash:</strong> ${data.signature.metaHash}</p>
+            <p><strong>Locations:</strong> ${data.signature.locations.join(', ')}</p>
+            <p><strong>Version:</strong> ${data.signature.version}</p>
+            <p><strong>Format:</strong> ${data.format || 'PNG'}</p>
+            <a href="${data.downloadUrl}" class="download-btn" download>⬇️ Download Signed ${fileType}</a>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+        } else {
+          result.className = 'result show error';
+          result.innerHTML = `<h3>❌ Signing Failed</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+      } catch (err) {
+        result.className = 'result show error';
+        result.innerHTML = `<h3>❌ Error</h3><p>${err.message}</p>`;
+      }
+      
+      btn.disabled = false;
+      btn.textContent = 'Sign File';
+    }
+    
+    async function verifyFile() {
+      if (!verifyFileData) return;
+      
+      const btn = document.getElementById('verify-btn');
+      const result = document.getElementById('verify-result');
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+      
+      const formData = new FormData();
+      formData.append('file', verifyFileData);
+      
+      try {
+        const res = await fetch('/api/verify', { method: 'POST', body: formData });
+        const data = await res.json();
+        
+        const isPdf = verifyFileData.type === 'application/pdf';
+        const fileType = isPdf ? 'PDF' : 'Image';
+        
+        if (data.signed) {
+          const statusClass = data.tampered ? 'warning' : 'success';
+          const badge = data.tampered 
+            ? '<span class="status-badge tampered">⚠️ TAMPERED</span>'
+            : '<span class="status-badge signed">✅ VERIFIED</span>';
+          
+          result.className = `result show ${statusClass}`;
+          result.innerHTML = `
+            <h3>${badge} elaraSign Detected</h3>
+            <p><strong>Version:</strong> ${data.signature.version}</p>
+            <p><strong>Timestamp:</strong> ${data.signature.timestamp || 'N/A'}</p>
+            <p><strong>Meta Hash:</strong> ${data.signature.metaHash}</p>
+            <p><strong>Valid Locations:</strong> ${data.signature.validLocations?.join(', ') || 'N/A'}</p>
+            <p>${data.message}</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+        } else {
+          result.className = 'result show error';
+          result.innerHTML = `
+            <h3><span class="status-badge unsigned">❌ NOT SIGNED</span></h3>
+            <p>${data.message}</p>
+          `;
+        }
+      } catch (err) {
+        result.className = 'result show error';
+        result.innerHTML = `<h3>❌ Error</h3><p>${err.message}</p>`;
+      }
+      
+      btn.disabled = false;
+      btn.textContent = 'Verify File';
+    }
+  </script>
+</body>
+</html>

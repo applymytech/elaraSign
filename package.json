@@ -1,0 +1,53 @@
+{
+  "name": "elara-sign",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Universal file signing service - embed provenance metadata into images",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "elara-sign": "dist/cli/index.js"
+  },
+  "scripts": {
+    "dev": "npx kill-port 3010 2>nul & tsx watch src/cloud/server.ts",
+    "dev:clean": "powershell -Command \"Get-NetTCPConnection -LocalPort 3010 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }\" & tsx watch src/cloud/server.ts",
+    "build": "tsc",
+    "build:cli": "tsc && chmod +x dist/cli/index.js",
+    "test": "tsx src/core/signing-core.test.ts",
+    "test:run": "tsx src/core/signing-core.test.ts",
+    "lint": "biome check src/",
+    "format": "biome format --write src/"
+  },
+  "keywords": [
+    "image-signing",
+    "provenance",
+    "watermark",
+    "content-authenticity",
+    "ai-generated"
+  ],
+  "author": "OpenElara",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openelara/elara-sign.git"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "express": "^5.0.0",
+    "multer": "^2.0.0",
+    "pngjs": "^7.0.0",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.0.0",
+    "@types/pngjs": "^6.0.5",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

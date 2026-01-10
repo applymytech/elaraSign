@@ -1,0 +1,3 @@
+# Core signing logic goes here
+# - signing-core.ts (copy from architecture-review)
+# - signing-core.test.ts (copy from architecture-review)
