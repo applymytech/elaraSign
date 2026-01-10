@@ -1,86 +1,164 @@
 # elaraSign
 
-**Universal File Signing Service + Open Source Library**
+**Content Provenance Standard + Public Signing Service**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+🌐 **Live Service**: [sign.openelara.org](https://sign.openelara.org)
 
 ---
 
 ## 🎯 What is elaraSign?
 
-elaraSign is the **canonical implementation** of the Elara signing standard - a content signing system that embeds provenance metadata into files (primarily images).
+elaraSign is a **content provenance standard** that embeds generation metadata into files. It answers the question: *"How was this content created?"*
 
-### Features
+### 4-Layer Protection
 
-- **🌐 Cloud Service** - Public API for signing files
-- **💻 Local CLI** - Offline signing tool
-- **📦 Library** - Import signing logic into your own apps
-- **🔍 Verification** - Validate signed files haven't been modified
-- **🛡️ Crop-Resilient** - 3-location embedding survives partial cropping
+| Layer | Name | Technique | Survives |
+|-------|------|-----------|----------|
+| 1 | **Billboard** | EXIF/PNG metadata | Basic sharing (easily stripped) |
+| 2 | **DNA** | LSB steganography | Lossless only |
+| 3 | **The Spread** | DCT spread spectrum | **JPEG, screenshots, cropping** |
+| 4 | **Forensic** | AES-256 encrypted | Same as The Spread |
 
----
+📖 **[Full Architecture Docs](docs/WATERMARK_ARCHITECTURE.md)**
 
-## 📦 Installation
+### The Standard
 
-### CLI Tool
-
-```bash
-npm install -g elara-sign
-
-# Sign a file
-elara-sign sign ./my-image.png
-
-# Verify a file
-elara-sign verify ./my-image.png
-```
-
-### Library
-
-```bash
-npm install elara-sign
-```
-
-```typescript
-import { signImage, verifySignature } from 'elara-sign';
-
-// Sign an image
-const result = await signImage(imageBuffer, {
-  generator: 'my-app',
-  model: 'flux-schnell'
-});
-
-// Verify
-const verification = await verifySignature(signedImage);
-console.log(verification.isValid); // true
-```
+Every signed file contains:
+- **Generation Method**: `ai`, `human`, `mixed`, `unknown`
+- **Generator**: Which tool/app created it
+- **Timestamp**: When it was created
+- **Integrity Hash**: Proof content hasn't been modified
+- **Forensic Data**: Encrypted accountability (IP, fingerprint) - operator only
 
 ---
 
-## 🌐 Cloud Service
+## ⚠️ Brutal Honesty
 
-**Production**: https://sign.openelara.com  
-**Staging**: https://sign-dev.openelara.com
+### What SURVIVES (The Spread layer):
+- ✅ JPEG compression (>50% quality)
+- ✅ Screenshots
+- ✅ Cropping
+- ✅ Social media upload
+- ✅ Format conversion
 
-### API Endpoints
+### What DOES NOT survive:
+- ❌ Heavy blur or noise
+- ❌ Extreme compression (<50% JPEG)
+- ❌ Rotation/perspective transforms
+- ❌ AI regeneration (img2img)
+- ❌ Print and re-scan
+- ❌ Dedicated removal attacks
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/sign` | POST | Sign a file |
-| `/api/verify` | POST | Verify a signed file |
-| `/api/download/:id` | GET | Download signed file |
-| `/api/sidecar/:id` | GET | Download JSON sidecar |
+**This is a deterrent and accountability system, not magic.**
 
-### Quick Example
+### The Service
+
+This repository provides a **free public signing service** at [sign.openelara.org](https://sign.openelara.org):
+- Upload an image → Get it signed with provenance metadata
+- Upload a signed image → Verify its authenticity and view metadata
+
+---
+
+## 🌍 Why This Matters
+
+```
+TODAY: Anyone can claim any image is real or AI-generated. No proof either way.
+
+WITH ELARASIGN: Generation method is embedded at creation time.
+                When adopted, AI images always show their provenance.
+                Transparency becomes the default, not the exception.
+```
+
+### The Trust Model
+
+elaraSign doesn't detect AI images - it **records provenance at generation time**.
+
+- ✅ AI generators that adopt elaraSign → Always signed as AI
+- ✅ Human artists can sign their work → Proves human creation
+- ⚠️ Bad actors can still lie → But they can't forge a legitimate signature
+- 🎯 Goal: Make signing ubiquitous, so unsigned = suspicious
+
+**When image APIs adopt this standard, the problem solves itself.**
+
+---
+
+## 📋 Supported Content
+
+| Type | Status | Notes |
+|------|--------|-------|
+| **Images** | ✅ Ready | PNG, JPEG, WebP |
+| **PDF** | 🔜 Planned | Metadata in document properties |
+| **Video** | 🔜 Planned | Frame-level + file-level signing |
+| **Audio** | 🔜 Planned | Waveform embedding |
+
+**Current Focus: Images** - AI images are trivial to create and impossible to distinguish. We solve this first.
+
+---
+
+## 🔧 How It Works
+
+### Signing (v2.0 Standard)
+
+1. **Metadata created**: Generation method, timestamp, model, etc.
+2. **Hashes computed**: Content hash + metadata hash (SHA-256)
+3. **Signature embedded**: 48-byte compact binary in 3 locations
+4. **PNG chunks added**: Full metadata in standard PNG text chunks
+
+### Multi-Location Redundancy
+
+```
+┌──────┐─────────────────────────────────┌──────┐
+│ LOC1 │                                 │ LOC2 │
+│ TL   │                                 │ TR   │
+└──────┘                                 └──────┘
+│                                               │
+│              YOUR IMAGE                       │
+│                                               │
+├─────────────────┌──────┐─────────────────────┤
+│                 │ LOC3 │                     │
+│                 │ BC   │                     │
+└─────────────────└──────┘─────────────────────┘
+
+Any ONE location surviving = Valid signature
+Trolls must crop ALL THREE corners to remove provenance
+```
+
+---
+
+## 🌐 API Reference
+
+### Sign an Image
 
 ```bash
-# Sign a file
-curl -X POST https://sign.openelara.com/api/sign \
-  -F "file=@image.png" \
-  -o signed-image.png
+POST /api/sign
+Content-Type: multipart/form-data
 
-# Verify a file  
-curl -X POST https://sign.openelara.com/api/verify \
-  -F "file=@signed-image.png"
+file: <image file>
+generator: "my-app" (optional)
+method: "ai" | "human" | "mixed" (optional, default: "ai")
+```
+
+### Verify an Image
+
+```bash
+POST /api/verify
+Content-Type: multipart/form-data
+
+file: <image file>
+```
+
+### Download Signed Image
+
+```bash
+GET /api/download/:sessionId
+```
+
+### Get Sidecar JSON
+
+```bash
+GET /api/sidecar/:sessionId
 ```
 
 ---
@@ -90,35 +168,42 @@ curl -X POST https://sign.openelara.com/api/verify \
 ```
 elaraSign/
 ├── src/
-│   ├── core/           # Signing logic (portable)
+│   ├── core/           # THE signing standard (portable)
 │   │   ├── signing-core.ts
 │   │   └── signing-core.test.ts
-│   ├── cloud/          # Cloud service
+│   ├── cloud/          # Cloud Run service
 │   │   ├── server.ts
 │   │   └── routes/
-│   └── local/          # CLI tool
-│       └── commands/
-├── docs/               # Documentation
-├── deploy/             # Deployment configs
-└── web/                # Web UI
+│   └── local/          # CLI tool (future)
+├── web/                # Demo UI
+└── deploy/             # Cloud Run deployment
+```
+
+### Code Flow
+
+```
+elaraSign/src/core/signing-core.ts  ← CANONICAL SOURCE
+    │
+    │ COPY to (not import):
+    │
+    ├──► openElara Desktop (src/lib/)
+    └──► openElaraCloud (src/lib/)
 ```
 
 ---
 
-## 🔧 Development
+## 🚀 Development
 
 ```bash
 # Install dependencies
 npm install
 
-# Run tests
+# Run tests (12/12 should pass)
 npm test
 
 # Start local server
 npm run dev
-
-# Build CLI
-npm run build:cli
+# Server at http://localhost:3010
 ```
 
 ---
@@ -130,37 +215,34 @@ npm run build:cli
 - **48-byte compact binary** embedded in image pixels
 - **3 locations**: top-left, top-right, bottom-center
 - **Crop-resilient**: Any 1 location surviving = valid signature
-- **Metadata**: content hash, meta hash, timestamp, generator
+- **Metadata**: content hash, meta hash, timestamp, generator, method
 
 ### Supported Formats
 
 | Format | Sign | Verify | Notes |
 |--------|------|--------|-------|
 | PNG | ✅ | ✅ | Full support |
-| JPEG | ✅ | ✅ | Lossy compression may affect some locations |
-| WebP | 🔜 | 🔜 | Planned |
+| JPEG | ✅ | ✅ | Lossy compression may degrade some locations |
+| WebP | ✅ | ✅ | Full support |
 
 ---
 
-## 🌌 Elara Universe
+## 🌌 Part of the Elara Universe
 
-elaraSign is part of the OpenElara ecosystem:
-
-| Project | Type | Purpose |
+| Project | Type | Signing |
 |---------|------|---------|
-| **elaraSign** | This repo | Canonical signing service |
-| [elaraSDEngineTest](../elaraSDEngineTest) | Tool | SD generation testing |
-| [openElara](../openElara) | Desktop App | Full AI assistant |
-| [openElaraCloud](../openElaraCloud) | Cloud App | Web AI assistant |
+| **elaraSign** | Public Service | Reference implementation (this repo) |
+| **openElara** | Desktop App | Embedded signing |
+| **openElaraCloud** | Cloud App | Embedded signing |
+
+All projects use **identical copies** of `signing-core.ts` - this repo is the source of truth.
 
 ---
 
 ## 📄 License
 
-MIT License - See [LICENSE](LICENSE) for details.
+MIT License - Use this standard freely. The more adoption, the better for everyone.
 
 ---
 
-## 🤝 Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+*"Transparency is not optional. It's the foundation of trust."*

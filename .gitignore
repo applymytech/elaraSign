@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Build info (generated per deployment)
+build-info.json
+
 # Environment
 .env
 .env.local
@@ -31,3 +34,39 @@ test-output/
 # Temporary files
 *.tmp
 *.temp
+
+# ============================================================================
+# SECRETS - NEVER COMMIT THESE
+# ============================================================================
+
+# Deployment config (contains account/project info)
+deploy.config.json
+
+# GCP Service Account Keys (CRITICAL - never commit!)
+*.json.key
+service-account*.json
+credentials*.json
+gcp-key*.json
+
+# Actual deployment scripts with real values (use .template versions)
+# deploy.ps1 is safe (no secrets), but if you add secrets, ignore it
+# setup-gcp.ps1 is safe (no secrets)
+
+# Any file with "secret" in the name
+*secret*
+*SECRET*
+
+# Private keys
+*.pem
+*.key
+*.p12
+
+# ============================================================================
+# DEPLOYMENT STATE (local only)
+# ============================================================================
+
+# Cloud Build logs
+cloudbuild-*.log
+
+# Docker cache
+.docker/

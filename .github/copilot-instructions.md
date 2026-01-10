@@ -1,100 +1,106 @@
 # elaraSign - Copilot Instructions
 
-## ⚠️ CRITICAL: This is the CANONICAL Signing Implementation
+## ⚠️ CRITICAL: This is the Content Provenance Standard
 
 ```
 ╔════════════════════════════════════════════════════════════════════════════════╗
-║                        CANONICAL SOURCE PRINCIPLE                               ║
+║                        ELARASIGN = PROVENANCE STANDARD                          ║
 ║                                                                                 ║
-║  🏠 elaraSign = THE authoritative signing implementation                        ║
+║  🎯 Purpose: Embed generation metadata into content                             ║
+║  🌐 Service: Public cloud signing at sign.openelara.org                         ║
+║  📋 Focus: IMAGES FIRST (then PDF, then video)                                  ║
 ║                                                                                 ║
-║  ✅ All signing logic is developed and proven HERE                              ║
-║  ✅ Other apps COPY from here (they don't import)                               ║
-║  ✅ This is both a library AND a cloud service                                  ║
+║  This is NOT "AI detection" - it's provenance tracking.                         ║
+║  Generation method can be: ai, human, mixed, unknown                            ║
 ╚════════════════════════════════════════════════════════════════════════════════╝
 ```
 
-## Project Overview
+## What elaraSign IS
 
-elaraSign provides:
-1. **Core Library** - `src/core/signing-core.ts` - The signing logic
-2. **Cloud Service** - `src/cloud/` - Public API at sign.openelara.com
-3. **CLI Tool** - `src/local/` - Offline signing command
+1. **A Content Provenance Standard** - Embeds generation metadata into files
+2. **A Public Cloud Service** - Free signing/verification at sign.openelara.org
+3. **The Canonical Implementation** - Other Elara apps copy this code
+4. **Image-First** - Solving the biggest problem (AI images) before PDF/video
+
+## What elaraSign is NOT
+
+- ❌ NOT "AI detection" (we record provenance, not detect it)
+- ❌ NOT an npm package (cloud service focus)
+- ❌ NOT a CLI tool (scaffolding only, not priority)
 
 ## Architecture
 
 ```
 elaraSign/
 ├── src/
-│   ├── core/               # CANONICAL signing logic
-│   │   ├── signing-core.ts      # THE implementation
-│   │   └── signing-core.test.ts # THE tests
-│   ├── cloud/              # Cloud service
+│   ├── core/                 # THE signing standard (portable)
+│   │   ├── signing-core.ts   # CANONICAL - copy to other apps
+│   │   └── signing-core.test.ts
+│   ├── cloud/                # Cloud Run service
 │   │   ├── server.ts
-│   │   ├── routes/
-│   │   │   ├── sign.ts
-│   │   │   ├── verify.ts
-│   │   │   └── download.ts
-│   │   └── storage/
-│   │       └── session-manager.ts
-│   ├── local/              # CLI tool
-│   │   ├── index.ts
-│   │   └── commands/
-│   └── index.ts            # Library exports
-├── docs/                   # Documentation
-├── deploy/                 # Deployment configs
-└── web/                    # Web UI (optional)
+│   │   └── routes/
+│   └── local/                # CLI (scaffolding, low priority)
+├── web/                      # Demo UI (Elara branding)
+└── deploy/                   # Cloud Run deployment
 ```
 
-## Code Flow
+## Code Flow (IMPORTANT)
 
 ```
-elaraSign/src/core/signing-core.ts (CANONICAL)
+elaraSign/src/core/signing-core.ts  ← CANONICAL SOURCE
     │
-    │ COPY to other projects (not import)
+    │ COPY to (never import):
     │
     ├──► openElara/src/lib/signing-core.ts
-    ├──► openElaraCloud/src/lib/signing-core.ts
-    └──► elaraSDEngineTest/src/core/signing-core.ts
+    └──► openElaraCloud/src/lib/signing-core.ts
 ```
 
-## Key Principles
+**Each app has its OWN COPY. This is CORRECT.**
 
-1. **This is the source of truth** for signing logic
-2. **Other apps copy** the signing-core.ts file, they don't import it
-3. **Tests must pass** here before copying to other projects
-4. **Cloud service** uses the same core logic as the library
+## Deployment
 
-## Development Workflow
+- **Platform**: Google Cloud Run
+- **Project**: elarasign (same Google account as openElaraCloud, different project)
+- **Domain**: sign.openelara.org
+- **Deploy**: `./deploy.ps1`
 
-### Updating Signing Logic
+## The Trust Model
+
+```
+elaraSign doesn't detect AI images - it records provenance at creation time.
+
+✅ AI generators that adopt elaraSign → Always signed as AI
+✅ Human artists can sign their work → Proves human creation
+⚠️ Bad actors can still lie → But they can't forge a legitimate signature
+🎯 Goal: When adopted widely, unsigned = suspicious
+```
+
+## Current Status
+
+| Component | Status |
+|-----------|--------|
+| signing-core.ts | ✅ Complete (12/12 tests) |
+| Cloud server | ✅ Complete |
+| API routes | ✅ Complete |
+| Web UI | ✅ Complete (needs Elara branding) |
+| Cloud Run deploy | 🔜 Setting up |
+| CLI tool | ⏸️ Low priority (scaffolding) |
+
+## Testing
+
 ```bash
-# 1. Edit src/core/signing-core.ts
-# 2. Run tests
+# Run signing tests
 npm test
 
-# 3. If tests pass, copy to other projects
-Copy-Item "src/core/signing-core.ts" "c:\myCodeProjects\openElara\src\lib\"
-Copy-Item "src/core/signing-core.ts" "c:\myCodeProjects\openElaraCloud\src\lib\"
-```
-
-### Running the Cloud Service
-```bash
+# Start local server
 npm run dev
-# Server starts at http://localhost:3000
+# http://localhost:3010
 ```
 
-### Building CLI
-```bash
-npm run build:cli
-# Test with: npx elara-sign --help
-```
+## Branding
 
-## Related Projects
-
-| Project | Relationship |
-|---------|--------------|
-| **openElara** | Desktop app - receives signing-core.ts copy |
-| **openElaraCloud** | Cloud app - receives signing-core.ts copy |
-| **elaraSDEngineTest** | Testing tool - receives signing-core.ts copy |
-| **architecture-review** | Universe docs & engineering tools |
+Follow the Elara Universe branding (see openElaraCloud login page for reference):
+- Dark theme (#1a1a2e background)
+- Cyan accent (#00d4aa)
+- Professional but approachable
+- "Transparency is not optional" tagline

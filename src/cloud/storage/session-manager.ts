@@ -41,12 +41,13 @@ export async function createSession(data: {
   mimeType?: string;
   signature: { metaHash: string; locations: string[]; timestamp: string };
   metadata: object;
+  sidecar?: object; // Optional: use enhanced sidecar from standard-metadata.ts
 }): Promise<Session> {
   const id = crypto.randomBytes(16).toString('hex');
   const now = new Date();
 
-  // Build sidecar from metadata and signature
-  const sidecar = {
+  // Use provided sidecar or build a basic one from metadata and signature
+  const sidecar = data.sidecar || {
     elaraSign: {
       version: '2.0',
       ...data.signature,

@@ -1,12 +1,31 @@
 /**
  * Sign Route - POST /api/sign
  *
- * Accepts any image or PDF file, signs it with elaraSign v2.0.
- * - Images: JPG, PNG, WebP, GIF, BMP, TIFF → signed and returned in same format (or PNG)
- * - PDFs: Metadata embedded in PDF info dictionary
+ * HYBRID SIGNATURE STRATEGY (4 LAYERS):
+ * =====================================
+ * 
+ * 1. "Billboard" (Public) - Standard EXIF/IPTC/XMP + PNG tEXt metadata
+ *    - Visible in Windows File Properties → Details
+ *    - Readable by Adobe, ExifTool, standard image viewers
+ *    - Easy to strip but provides trust signal to legitimate users
+ * 
+ * 2. "DNA" (Internal) - LSB steganographic embedding via signing-core.ts
+ *    - Hidden in LSB blue channel, 3 locations, crop-resilient
+ *    - Survives lossless operations only
+ *    - Our sovereign proof that only Elara tools can fully verify
+ * 
+ * 3. "The Spread" (Robust) - DCT spread spectrum watermarking
+ *    - Encrypted forensic data spread across frequency domain
+ *    - SURVIVES: JPEG compression, screenshots, cropping, social media
+ *    - This is the "trap" - predator can't escape even with screenshot
+ * 
+ * 4. "Forensic Payload" - Encrypted accountability data
+ *    - AES-256 encrypted with operator's master key
+ *    - Only law enforcement / operator can decrypt
+ *    - Contains: timestamp, IP, user fingerprint, platform
  */
 
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
 import zlib from 'node:zlib';
@@ -17,7 +36,69 @@ import {
   createPromptHash,
   type ElaraContentMetadata 
 } from '../../core/signing-core.js';
+import {
+  injectJpegExif,
+  buildPngTextChunks,
+  generateSidecar,
+  type StandardMetadataOptions,
+} from '../../core/standard-metadata.js';
 import { createSession } from '../storage/session-manager.js';
+import {
+  encryptAccountability,
+  PLATFORM_CODES,
+  type AccountabilityData,
+} from '../../core/forensic-crypto.js';
+import {
+  embedSpreadSpectrum,
+  type SpreadSpectrumPayload,
+} from '../../core/spread-spectrum.js';
+
+// ============================================================================
+// FORENSIC ACCOUNTABILITY CONFIGURATION
+// ============================================================================
+
+/**
+ * Master key for forensic accountability.
+ * 
+ * LIFECYCLE:
+ * 1. Generate ONCE: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ * 2. Store in Secret Manager: gcloud secrets create elarasign-master-key --data-file=-
+ * 3. Bind to Cloud Run as env var (see cloudbuild.yaml)
+ * 4. NEVER regenerate - same key forever (or old images become orphaned)
+ * 5. Save key offline for "break glass" decryption
+ * 
+ * If not set, forensic accountability is disabled (development mode).
+ */
+const FORENSIC_MASTER_KEY = process.env.ELARASIGN_MASTER_KEY || '';
+const FORENSIC_ENABLED = FORENSIC_MASTER_KEY.length === 64;
+
+/**
+ * Extract client IP from request
+ */
+function getClientIP(req: Request): string {
+  // Standard headers for proxied requests
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const ips = typeof forwarded === 'string' ? forwarded : forwarded[0];
+    return ips.split(',')[0].trim();
+  }
+  return req.ip || req.socket.remoteAddress || '0.0.0.0';
+}
+
+/**
+ * Convert IP string to bytes (IPv4 only, others get zeros)
+ */
+function ipToBytes(ip: string): Uint8Array {
+  const bytes = new Uint8Array(4);
+  const match = ip.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (match) {
+    bytes[0] = Number.parseInt(match[1], 10);
+    bytes[1] = Number.parseInt(match[2], 10);
+    bytes[2] = Number.parseInt(match[3], 10);
+    bytes[3] = Number.parseInt(match[4], 10);
+  }
+  return bytes;
+}
 
 const router = Router();
 
@@ -158,6 +239,8 @@ async function buildMetadata(
     prompt?: string;
     userId?: string;
     seed?: number;
+    creatorName?: string;
+    creatorEmail?: string;
   }
 ): Promise<ElaraContentMetadata> {
   const contentHash = await sha256Hex(contentBuffer);
@@ -167,6 +250,14 @@ async function buildMetadata(
   const promptHash = options.prompt 
     ? await createPromptHash(options.prompt)
     : await sha256Hex('elara:no-prompt');
+  
+  // Build creator string with optional contact
+  let creatorInfo = options.creatorName || '';
+  if (options.creatorEmail) {
+    creatorInfo = creatorInfo 
+      ? `${creatorInfo} <${options.creatorEmail}>`
+      : options.creatorEmail;
+  }
   
   return {
     signatureVersion: '2.0',
@@ -180,6 +271,8 @@ async function buildMetadata(
     modelUsed: options.model || 'unknown',
     promptHash,
     seed: options.seed,
+    // Store creator info in a custom field (will be hashed into signature)
+    creatorInfo: creatorInfo || undefined,
   };
 }
 
@@ -196,12 +289,12 @@ async function signPdf(
   
   // Create signature block
   const signatureBlock = [
-    `%% ELARA_SIGN_START`,
-    `%% Version: 2.0`,
+    '%% ELARA_SIGN_START',
+    '%% Version: 2.0',
     `%% MetaHash: ${metaHash}`,
     `%% Generator: ${metadata.generator}`,
     `%% Timestamp: ${timestamp}`,
-    `%% ELARA_SIGN_END`,
+    '%% ELARA_SIGN_END',
     '',
   ].join('\n');
   
@@ -251,6 +344,58 @@ function verifyPdfSignature(pdfBuffer: Buffer): {
   };
 }
 
+/**
+ * Extract forensic payload from PNG tEXt chunks
+ * Returns the base64-encoded encrypted forensic data, or null if not found
+ */
+function extractForensicPayload(imageBuffer: Buffer): string | null {
+  // Check PNG signature
+  const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  if (!imageBuffer.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    return null; // Not a PNG
+  }
+  
+  let offset = 8; // Skip PNG signature
+  
+  while (offset < imageBuffer.length) {
+    // Read chunk length (4 bytes, big-endian)
+    const length = imageBuffer.readUInt32BE(offset);
+    offset += 4;
+    
+    // Read chunk type (4 bytes)
+    const chunkType = imageBuffer.subarray(offset, offset + 4).toString('ascii');
+    offset += 4;
+    
+    // Read chunk data
+    const chunkData = imageBuffer.subarray(offset, offset + length);
+    offset += length;
+    
+    // Skip CRC (4 bytes)
+    offset += 4;
+    
+    // Check for our forensic chunk
+    if (chunkType === 'tEXt') {
+      // tEXt format: keyword + null + text
+      const nullIndex = chunkData.indexOf(0);
+      if (nullIndex > 0) {
+        const keyword = chunkData.subarray(0, nullIndex).toString('latin1');
+        const text = chunkData.subarray(nullIndex + 1).toString('latin1');
+        
+        if (keyword === 'elaraSign:forensic') {
+          return text;
+        }
+      }
+    }
+    
+    // Stop at IEND
+    if (chunkType === 'IEND') {
+      break;
+    }
+  }
+  
+  return null;
+}
+
 router.post('/sign', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -260,14 +405,36 @@ router.post('/sign', upload.single('file'), async (req, res) => {
     const { mimetype, buffer, originalname } = req.file;
     const outputFormat = req.body.outputFormat || 'same'; // 'same' or 'png'
     
+    // Parse generation method (ai/human/mixed/unknown) - defaults to 'ai'
+    const generationMethod = (['ai', 'human', 'mixed', 'unknown'] as const)
+      .includes(req.body.method) ? req.body.method : 'ai';
+    
     // Build metadata with proper required fields
     const metadata = await buildMetadata(buffer, {
       generator: req.body.generator,
       model: req.body.model,
       prompt: req.body.prompt,
       userId: req.body.userId,
-      seed: req.body.seed ? parseInt(req.body.seed) : undefined,
+      seed: req.body.seed ? Number.parseInt(req.body.seed) : undefined,
+      creatorName: req.body.creatorName,
+      creatorEmail: req.body.creatorEmail,
     });
+    
+    // Build creator string for standard metadata
+    let creatorDisplay = req.body.creatorName || metadata.generator;
+    if (req.body.creatorEmail && req.body.creatorName) {
+      creatorDisplay = `${req.body.creatorName}`;
+    }
+    
+    // Standard metadata options for the "Passport" layer (visible in Windows Properties, etc.)
+    const standardMetaOptions: StandardMetadataOptions = {
+      generator: metadata.generator,
+      model: metadata.modelUsed,
+      generationMethod: generationMethod,
+      timestamp: new Date().toISOString(),
+      metaHash: '', // Will be set after signing
+      creator: creatorDisplay,
+    };
 
     // Handle PDF separately
     if (mimetype === 'application/pdf') {
@@ -319,33 +486,82 @@ router.post('/sign', upload.single('file'), async (req, res) => {
     // Sign the image (embeds steganographic signature in pixel data)
     const result = await signImageContent(imageData, width, height, metadata);
 
+    // ========================================================================
+    // FORENSIC ACCOUNTABILITY (if enabled)
+    // ========================================================================
+    let forensicPayload: string | undefined;
+    let finalImageData = result.signedImageData;
+    
+    if (FORENSIC_ENABLED) {
+      // Create accountability data for "break glass" scenarios
+      const userFingerprintBytes = Buffer.from(
+        metadata.userFingerprint.slice(0, 16), // First 16 hex chars = 8 bytes
+        'hex'
+      );
+      
+      const accountabilityData: AccountabilityData = {
+        timestamp: Math.floor(Date.now() / 1000),
+        userFingerprint: new Uint8Array(userFingerprintBytes),
+        ipAddress: ipToBytes(getClientIP(req)),
+        platformCode: PLATFORM_CODES['elara.sign.web'],
+      };
+      
+      // Encrypt with master key (only operator can decrypt later)
+      const encrypted = encryptAccountability(
+        accountabilityData,
+        FORENSIC_MASTER_KEY,
+        result.metaHash // Use metaHash as salt for uniqueness
+      );
+      
+      // Base64 encode for storage in metadata
+      forensicPayload = Buffer.from(encrypted).toString('base64');
+      
+      // ======================================================================
+      // "THE SPREAD" - DCT Spread Spectrum Watermarking
+      // ======================================================================
+      // This embeds the SAME forensic data into the frequency domain
+      // It survives: JPEG, screenshots, cropping, social media
+      // The predator cannot escape even with a screenshot
+      
+      const spreadPayload: SpreadSpectrumPayload = {
+        timestamp: accountabilityData.timestamp,
+        ipBytes: accountabilityData.ipAddress,
+        fingerprint: accountabilityData.userFingerprint,
+        platformCode: accountabilityData.platformCode,
+      };
+      
+      // Embed spread spectrum watermark (uses metaHash as unique seed)
+      finalImageData = embedSpreadSpectrum(
+        result.signedImageData,
+        width,
+        height,
+        spreadPayload,
+        result.metaHash
+      );
+    }
+
     // Determine output format
     let outputMime = mimetype;
     let outputBuffer: Buffer;
     let outputExt = originalname.split('.').pop() || 'png';
 
-    // Create sharp instance from signed raw pixel data
-    const signedImage = sharp(Buffer.from(result.signedImageData), {
+    // Create sharp instance from signed raw pixel data (with spread spectrum if enabled)
+    const signedImage = sharp(Buffer.from(finalImageData), {
       raw: { width, height, channels: 4 }
     });
 
     // PNG text chunks for metadata (PNG-specific, survives most processing)
-    const pngTextChunks = {
-      'Software': 'elaraSign v2.0',
-      'Comment': JSON.stringify({
-        elaraSign: {
-          version: '2.0',
-          metaHash: result.metaHash,
-          locations: result.locationsEmbedded,
-          timestamp: new Date().toISOString(),
-        },
-        generator: metadata.generator,
-        model: metadata.modelUsed,
-      }),
-      'Description': 'AI-generated content signed with elaraSign',
-      'Author': metadata.generator,
-      'Source': 'elaraSign - https://sign.openelara.com',
-    };
+    // Enhanced with standard metadata for the "Passport" layer
+    const pngTextChunks = buildPngTextChunks({
+      ...standardMetaOptions,
+      metaHash: result.metaHash,
+    });
+    
+    // Add forensic payload to PNG chunks if enabled
+    if (forensicPayload) {
+      // Store encrypted accountability data (only operator can decrypt)
+      pngTextChunks['elaraSign:forensic'] = forensicPayload;
+    }
 
     if (outputFormat === 'png' || mimetype === 'image/png') {
       outputBuffer = await signedImage
@@ -357,11 +573,18 @@ router.post('/sign', upload.single('file'), async (req, res) => {
       outputMime = 'image/png';
       outputExt = 'png';
     } else if (mimetype === 'image/jpeg') {
-      // JPEG is lossy - signature may degrade, warn user
-      // Note: JPEG doesn't support tEXt chunks, would need EXIF library
+      // JPEG output - inject EXIF/IPTC metadata for "Passport" layer
+      // Note: JPEG is lossy - steganographic signature may degrade, warn user
       outputBuffer = await signedImage
         .jpeg({ quality: 100 })
         .toBuffer();
+      
+      // Inject standard EXIF metadata (shows in Windows Properties, Adobe, ExifTool)
+      outputBuffer = injectJpegExif(outputBuffer, {
+        ...standardMetaOptions,
+        metaHash: result.metaHash,
+      });
+      
       outputMime = 'image/jpeg';
     } else if (mimetype === 'image/webp') {
       outputBuffer = await signedImage
@@ -391,10 +614,24 @@ router.post('/sign', upload.single('file'), async (req, res) => {
       outputExt = 'png';
     }
 
+    // Generate sidecar JSON for external verification
+    const sidecar = generateSidecar({
+      ...standardMetaOptions,
+      metaHash: result.metaHash,
+      contentHash: metadata.contentHash,
+      locations: result.locationsEmbedded,
+      originalFilename: originalname,
+    });
+
     // Create session for download
+    // Strip any existing "-signed" suffix before adding a fresh one
+    const baseName = originalname
+      .replace(/\.[^.]+$/, '')           // Remove extension
+      .replace(/-signed$/i, '');         // Remove existing -signed suffix
+    
     const session = await createSession({
       signedImage: outputBuffer,
-      originalName: originalname.replace(/\.[^.]+$/, `-signed.${outputExt}`),
+      originalName: `${baseName}-signed.${outputExt}`,
       signature: {
         metaHash: result.metaHash,
         locations: result.locationsEmbedded,
@@ -402,6 +639,7 @@ router.post('/sign', upload.single('file'), async (req, res) => {
       },
       metadata,
       mimeType: outputMime,
+      sidecar, // Include sidecar JSON for download
     });
 
     return res.json({
@@ -415,10 +653,17 @@ router.post('/sign', upload.single('file'), async (req, res) => {
         metaHash: result.metaHash,
         locations: result.locationsEmbedded,
         version: '2.0',
+        method: generationMethod, // DNA embedded + Passport visible
       },
       dimensions: { width, height },
+      metadata: {
+        standardMetadata: true, // Indicates Passport layer was applied
+        method: generationMethod,
+        exifInjected: mimetype === 'image/jpeg',
+        pngChunksInjected: outputMime === 'image/png',
+      },
       warning: mimetype === 'image/jpeg' 
-        ? 'JPEG is lossy - signature may degrade if image is re-saved. PNG recommended.'
+        ? 'JPEG is lossy - steganographic signature may degrade if image is re-saved. PNG recommended for perfect preservation.'
         : undefined,
       expiresIn: '10 minutes',
     });
@@ -430,5 +675,5 @@ router.post('/sign', upload.single('file'), async (req, res) => {
 });
 
 // Export PDF verification for verify route
-export { verifyPdfSignature };
+export { verifyPdfSignature, extractForensicPayload };
 export { router as signRoutes };

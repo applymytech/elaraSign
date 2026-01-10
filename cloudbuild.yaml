@@ -1,0 +1,71 @@
+# Cloud Build configuration for elaraSign
+# Triggered automatically on push or manually via deploy.ps1
+#
+# Prerequisites:
+#   - Cloud Run API enabled
+#   - Artifact Registry API enabled
+#   - Cloud Build service account has Cloud Run Admin role
+
+substitutions:
+  _SERVICE_NAME: elara-sign
+  _REGION: us-central1
+  _REPOSITORY: elara-sign-repo
+
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest'
+      - '.'
+
+  # Step 2: Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}'
+
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '10'
+      - '--concurrency'
+      - '80'
+      - '--timeout'
+      - '60s'
+      - '--set-env-vars'
+      - 'NODE_ENV=production'
+      # Bind forensic master key from Secret Manager
+      # This secret is created ONCE via: scripts/setup-forensic-key.ps1
+      # Same key persists across all deployments (never regenerate!)
+      - '--set-secrets'
+      - 'ELARASIGN_MASTER_KEY=elarasign-master-key:latest'
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

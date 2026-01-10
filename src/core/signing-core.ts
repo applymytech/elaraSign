@@ -175,6 +175,9 @@ export interface ElaraContentMetadata {
   
   /** Negative prompt used */
   negativePrompt?: string;
+  
+  /** Creator info for human-created content (name/email combined) */
+  creatorInfo?: string;
 }
 
 /** Location identifiers for multi-location signing */

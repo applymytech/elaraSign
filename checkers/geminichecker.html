@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ElaraSign Independent Validator</title>
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: #eee; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        #drop-zone { border: 2px dashed #444; width: 80%; max-width: 600px; height: 300px; display: flex; align-items: center; justify-content: center; border-radius: 10px; transition: 0.3s; background: #222; }
+        #drop-zone.hover { border-color: #00ff88; background: #2a2a2a; }
+        #status { margin-top: 20px; font-size: 1.2rem; font-weight: bold; }
+        .success { color: #00ff88; }
+        .fail { color: #ff4444; }
+        .info { color: #aaa; font-size: 0.9rem; margin-top: 5px; font-family: monospace; }
+    </style>
+</head>
+<body>
+
+    <div id="drop-zone">Drag and drop an image here to verify Elara Signature</div>
+    <div id="status">Waiting for image...</div>
+    <div id="debug" class="info"></div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const status = document.getElementById('status');
+        const debug = document.getElementById('debug');
+
+        // Drag & Drop Visuals
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('hover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('hover');
+            const file = e.dataTransfer.files[0];
+            if (file) processImage(file);
+        });
+
+        function processImage(file) {
+            status.textContent = "Scanning pixels...";
+            status.className = "";
+            debug.textContent = "";
+
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+
+                // We only need to check Top-Left (Location 0) to prove existence
+                // Code says: Width 32, Height 4
+                const imageData = ctx.getImageData(0, 0, 32, 4);
+                const data = imageData.data;
+                
+                // Extract Steganography (Blue Channel LSBs)
+                // Logic based on signing-core.ts: embedAtLocation
+                let extractedBytes = [];
+                let currentByte = 0;
+                let nibbleIndex = 0;
+
+                // Loop through pixels to find "ELARA2" (6 bytes)
+                // 6 bytes * 2 nibbles = 12 pixels needed minimum
+                for (let i = 0; i < 32 * 4; i++) { 
+                    const blueVal = data[i * 4 + 2]; // R=0, G=1, B=2, A=3
+                    const nibble = blueVal & 0x0F;   // Bottom 4 bits
+
+                    if (nibbleIndex === 0) {
+                        currentByte = nibble << 4; // High nibble
+                        nibbleIndex = 1;
+                    } else {
+                        currentByte |= nibble;     // Low nibble
+                        extractedBytes.push(currentByte);
+                        currentByte = 0;
+                        nibbleIndex = 0;
+                    }
+                }
+
+                // Decode Text
+                const first6Bytes = new Uint8Array(extractedBytes.slice(0, 6));
+                const text = new TextDecoder().decode(first6Bytes);
+
+                if (text === "ELARA2") {
+                    status.textContent = "✅ VERIFIED: Elara v2.0 Signature Found";
+                    status.className = "success";
+                    debug.textContent = `Marker "${text}" detected in Top-Left pixels.`;
+                } else {
+                    status.textContent = "❌ NO SIGNATURE DETECTED";
+                    status.className = "fail";
+                    debug.textContent = `Found raw data: ${text.replace(/[^\x20-\x7E]/g, '?')}... (Expected 'ELARA2')`;
+                }
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+        }
+    </script>
+</body>
+</html>

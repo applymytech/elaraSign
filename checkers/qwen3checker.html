@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>elaraSign Full Local Verifier</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.6;
+    }
+    h1 { color: #2c3e50; }
+    .drop-area {
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      margin: 1rem 0;
+      background: #f9f9f9;
+      transition: all 0.2s;
+    }
+    .drop-area.highlight {
+      border-color: #3498db;
+      background: #eaf7ff;
+    }
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 1rem;
+      font-size: 1rem;
+    }
+    button:hover { background: #2980b9; }
+    button:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
+    }
+    .result-box {
+      margin-top: 1.5rem;
+      padding: 1.2rem;
+      border-radius: 8px;
+      background: #f8f9fa;
+      border-left: 4px solid #3498db;
+    }
+    .status {
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      border-radius: 4px;
+    }
+    .success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
+    .error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+    .warning { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; }
+    .info { background: #d1ecf1; color: #0c5460; border-left: 4px solid #17a2b8; }
+    pre {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.95em;
+      margin: 1rem 0;
+    }
+    .locations {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .loc-valid { background: #28a745; color: white; padding: 0.25rem 0.5rem; border-radius: 3px; }
+    .loc-invalid { background: #dc3545; color: white; padding: 0.25rem 0.5rem; border-radius: 3px; opacity: 0.7; }
+    .hash { font-family: monospace; background: #eee; padding: 0.1rem 0.3rem; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>elaraSign Full Local Verifier</h1>
+  <p>Upload a PNG/JPEG/WebP image to verify its elaraSign v2.0 signature locally in your browser.</p>
+
+  <div class="drop-area" id="dropArea">
+    <p>Drag & drop an image here or click to select</p>
+    <input type="file" id="fileInput" accept="image/*" style="display:none;" />
+    <button id="selectBtn">Select Image</button>
+  </div>
+
+  <div id="result"></div>
+
+  <!-- ELARASIGN CORE MODULE (embedded) -->
+  <script>
+    // ========================================================================
+    // EMBEDDED elaraSign v2.0 Core (from signing-core.ts)
+    // ========================================================================
+    const ELARA_MARKER = 'ELARA2';
+    const ELARA_VERSION = 0x02;
+    const SIGNATURE_LOCATIONS = {
+        topLeft: { name: 'top-left', width: 32, height: 4, getPosition: (w, h) => ({ x: 0, y: 0 }) },
+        topRight: { name: 'top-right', width: 4, height: 32, getPosition: (w, h) => ({ x: w - 4, y: 0 }) },
+        bottomCenter: { name: 'bottom-center', width: 32, height: 4, getPosition: (w, h) => ({ x: Math.floor((w - 32) / 2), y: h - 4 }) },
+    };
+    const MIN_IMAGE_SIZE = { width: 64, height: 36 };
+    const SIGNATURE_LAYOUT = { marker: 6, version: 1, locationId: 1, metaHash: 16, contentHash: 16, timestamp: 4, checksum: 4, total: 48 };
+    const BLOCK_CAPACITY = 64;
+    const LOCATION_IDS = { topLeft: 0, topRight: 1, bottomCenter: 2 };
+
+    // CRC-32 Table
+    const CRC32_TABLE = (() => {
+        const table = new Uint32Array(256);
+        for (let i = 0; i < 256; i++) {
+            let crc = i;
+            for (let j = 0; j < 8; j++) {
+                crc = (crc & 1) ? (0xEDB88320 ^ (crc >>> 1)) : (crc >>> 1);
+            }
+            table[i] = crc >>> 0;
+        }
+        return table;
+    })();
+
+    function crc32(data) {
+        let crc = 0xFFFFFFFF;
+        for (let i = 0; i < data.length; i++) {
+            crc = CRC32_TABLE[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
+        }
+        return (crc ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    function unpackSignature(signature) {
+        if (signature.length < SIGNATURE_LAYOUT.total) return null;
+        let offset = 0;
+        const markerBytes = signature.slice(offset, offset + SIGNATURE_LAYOUT.marker);
+        const marker = new TextDecoder().decode(markerBytes);
+        offset += SIGNATURE_LAYOUT.marker;
+        if (marker !== ELARA_MARKER) return null;
+
+        const version = signature[offset]; offset += SIGNATURE_LAYOUT.version;
+        const locationId = signature[offset]; offset += SIGNATURE_LAYOUT.locationId;
+        const metaHash = signature.slice(offset, offset + SIGNATURE_LAYOUT.metaHash); offset += SIGNATURE_LAYOUT.metaHash;
+        const contentHash = signature.slice(offset, offset + SIGNATURE_LAYOUT.contentHash); offset += SIGNATURE_LAYOUT.contentHash;
+        const timestamp = ((signature[offset] << 24) | (signature[offset + 1] << 16) | (signature[offset + 2] << 8) | signature[offset + 3]) >>> 0;
+        offset += SIGNATURE_LAYOUT.timestamp;
+        const checksum = ((signature[offset] << 24) | (signature[offset + 1] << 16) | (signature[offset + 2] << 8) | signature[offset + 3]) >>> 0;
+        const dataToChecksum = signature.slice(0, offset);
+        const computedChecksum = crc32(dataToChecksum);
+
+        return {
+            marker, version, locationId, metaHash, contentHash, timestamp,
+            checksum, computedChecksum, isValid: checksum === computedChecksum
+        };
+    }
+
+    function extractFromLocation(imageData, width, height, location) {
+        const pos = location.getPosition(width, height);
+        const blockWidth = location.width;
+        const blockHeight = location.height;
+        if (pos.x < 0 || pos.x + blockWidth > width || pos.y < 0 || pos.y + blockHeight > height) {
+            return null;
+        }
+        const result = [];
+        let currentByte = 0;
+        let nibbleIndex = 0;
+        for (let dy = 0; dy < blockHeight; dy++) {
+            for (let dx = 0; dx < blockWidth; dx++) {
+                if (result.length >= BLOCK_CAPACITY) break;
+                const x = pos.x + dx;
+                const y = pos.y + dy;
+                const pixelIndex = (y * width + x) * 4;
+                const blueChannelIndex = pixelIndex + 2;
+                const nibble = imageData[blueChannelIndex] & 0x0F;
+                if (nibbleIndex === 0) {
+                    currentByte = nibble << 4;
+                    nibbleIndex = 1;
+                } else {
+                    currentByte |= nibble;
+                    result.push(currentByte);
+                    currentByte = 0;
+                    nibbleIndex = 0;
+                }
+            }
+        }
+        const signature = new Uint8Array(result);
+        const marker = new TextDecoder().decode(signature.slice(0, 6));
+        if (marker !== ELARA_MARKER) return null;
+        return signature;
+    }
+
+    function extractMultiLocationSignature(imageData, width, height) {
+        const signatures = [];
+        const validLocations = [];
+        const invalidLocations = [];
+        const locations = [
+            { loc: SIGNATURE_LOCATIONS.topLeft, name: 'top-left' },
+            { loc: SIGNATURE_LOCATIONS.topRight, name: 'top-right' },
+            { loc: SIGNATURE_LOCATIONS.bottomCenter, name: 'bottom-center' },
+        ];
+        for (const { loc, name } of locations) {
+            const rawSig = extractFromLocation(imageData, width, height, loc);
+            if (rawSig) {
+                const unpacked = unpackSignature(rawSig);
+                if (unpacked?.isValid) {
+                    signatures.push(unpacked);
+                    validLocations.push(name);
+                } else {
+                    invalidLocations.push(name);
+                }
+            } else {
+                invalidLocations.push(name);
+            }
+        }
+        const bestSignature = signatures.length > 0
+            ? signatures.reduce((best, curr) => (curr?.timestamp ?? 0) > (best?.timestamp ?? 0) ? curr : best)
+            : null;
+        return { signatures, validLocations, invalidLocations, bestSignature };
+    }
+
+    function arrayToHex(arr) {
+        return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // ========================================================================
+    // UI Logic
+    // ========================================================================
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+    const selectBtn = document.getElementById('selectBtn');
+    const resultDiv = document.getElementById('result');
+
+    // Event setup
+    selectBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFile);
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length) processFile(files[0]);
+    });
+
+    async function handleFile(e) {
+      if (e.target.files.length) await processFile(e.target.files[0]);
+    }
+
+    async function processFile(file) {
+      if (!file.type.match('image.*')) {
+        showResult('❌ Please upload an image file (PNG, JPEG, WebP).', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('selectBtn');
+      btn.disabled = true;
+      btn.textContent = 'Processing...';
+
+      try {
+        const img = await loadImage(URL.createObjectURL(file));
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const extracted = extractMultiLocationSignature(imageData.data, canvas.width, canvas.height);
+
+        if (extracted.validLocations.length === 0) {
+          showResult(`
+            ❌ No valid elaraSign v2.0 signature found.<br>
+            This image is either unsigned, uses an older format, or has been heavily edited.
+          `, 'error');
+        } else {
+          const best = extracted.bestSignature;
+          const timestamp = new Date(best.timestamp * 1000).toLocaleString();
+          const metaHashHex = arrayToHex(best.metaHash);
+          const contentHashHex = arrayToHex(best.contentHash);
+
+          let html = `
+            <div class="status success">
+              ✅ Valid elaraSign v2.0 signature detected!
+            </div>
+            <div class="result-box">
+              <strong>Timestamp:</strong> ${timestamp}<br>
+              <strong>Metadata Hash:</strong> <span class="hash">${metaHashHex}</span><br>
+              <strong>Content Hash:</strong> <span class="hash">${contentHashHex}</span><br>
+              <strong>Valid Locations:</strong>
+              <div class="locations">
+                ${extracted.validLocations.map(loc => `<span class="loc-valid">${loc}</span>`).join('')}
+                ${extracted.invalidLocations.map(loc => `<span class="loc-invalid">${loc}</span>`).join('')}
+              </div>
+            </div>
+            <details style="margin-top: 1rem;">
+              <summary>Raw Signature Data (Hex)</summary>
+              <pre>${arrayToHex(extracted.signatures[0])}</pre>
+            </details>
+          `;
+          resultDiv.innerHTML = html;
+        }
+      } catch (err) {
+        console.error(err);
+        showResult(`⚠️ Error processing image: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Select Image';
+      }
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Failed to load image (CORS or corrupt file)'));
+        img.src = src;
+      });
+    }
+
+    function showResult(text, type) {
+      resultDiv.innerHTML = `<div class="status ${type}">${text}</div>`;
+    }
+  </script>
+</body>
+</html>

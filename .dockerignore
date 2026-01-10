@@ -1,0 +1,34 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Build output (we build in Docker)
+dist
+
+# Development files
+*.md
+.git
+.gitignore
+.env*
+.vscode
+*.log
+
+# Test files
+*.test.ts
+**/*.test.ts
+coverage
+.nyc_output
+
+# Local development
+src/local
+
+# Documentation
+docs
+
+# Independent checker tools (not part of elaraSign service)
+checkers
+
+# Deployment scripts (not needed in container, but scripts/ needed for build)
+deploy.ps1
+deploy-safe.ps1
+cloudbuild.yaml

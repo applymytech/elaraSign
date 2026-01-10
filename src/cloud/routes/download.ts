@@ -1,18 +1,63 @@
 /**
- * Download Routes - GET /api/download/:id, GET /api/sidecar/:id
+ * Download Routes - GET /api/download/:id
  *
- * Downloads signed file or sidecar JSON.
- * Files are deleted after successful download.
+ * Downloads signed file + sidecar as a ZIP bundle.
+ * Ensures provenance data always travels with the content.
+ * 
+ * Bundle contents:
+ * - image-signed.png (or .jpg, etc.) - The signed image with steganographic watermark
+ * - image-sidecar.json - Human/machine readable provenance data
+ * - README.txt - Instructions for verification
  */
 
 import { Router } from 'express';
+import archiver from 'archiver';
 import { getSession, markDownloaded, deleteSession } from '../storage/session-manager.js';
 
 const router = Router();
 
+/**
+ * Generate README content for the bundle
+ */
+function generateReadme(filename: string, sidecarName: string, metaHash: string): string {
+  return `elaraSign Content Provenance Bundle
+=====================================
+
+This bundle contains a signed file with embedded provenance metadata.
+
+CONTENTS:
+- ${filename} - Signed content with steganographic watermark
+- ${sidecarName} - Machine-readable provenance data (JSON)
+- README.txt - This file
+
+VERIFICATION:
+1. Visit https://sign.openelara.org
+2. Click "Verify" tab
+3. Upload the image file
+4. The system will read the embedded watermark and verify authenticity
+
+WHAT'S IN THE SIDECAR:
+- Generation method (AI/Human/Mixed)
+- Generator tool and model used
+- Signing timestamp
+- Content hash (SHA-256)
+- Meta hash: ${metaHash}
+
+The same data is embedded invisibly in the image pixels (survives metadata stripping).
+The sidecar provides human-readable access to this information.
+
+LEGAL:
+This provenance record was created at the time of signing.
+The embedded watermark cannot be removed without visibly damaging the image.
+
+Learn more: https://sign.openelara.org
+`;
+}
+
 router.get('/download/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
+    const format = req.query.format as string; // 'zip' (default), 'image', 'sidecar'
     const session = await getSession(sessionId);
 
     if (!session) {
@@ -30,28 +75,66 @@ router.get('/download/:sessionId', async (req, res) => {
       : mimeType === 'image/tiff' ? 'tiff'
       : 'png';
     
-    const filename = session.originalName.replace(/\.[^.]+$/, `-signed.${ext}`);
-    
-    // Set headers
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('X-Elara-Signature', session.signature.metaHash);
-    
-    if (mimeType !== 'application/pdf') {
-      res.setHeader('X-Elara-Sidecar-Url', `/api/sidecar/${sessionId}`);
+    const baseName = session.originalName.replace(/\.[^.]+$/, '');
+    const imageFilename = `${baseName}-signed.${ext}`;
+    const sidecarFilename = `${baseName}-sidecar.json`;
+    const bundleFilename = `${baseName}-elarasign-bundle.zip`;
+
+    // Individual file downloads (for backwards compatibility)
+    if (format === 'image') {
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${imageFilename}"`);
+      res.setHeader('X-Elara-Signature', session.signature.metaHash);
+      return res.send(session.signedImage);
     }
 
-    // Send file
-    res.send(session.signedImage);
+    if (format === 'sidecar') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${sidecarFilename}"`);
+      return res.json(session.sidecar);
+    }
 
-    // Schedule deletion (give time for sidecar download)
+    // Default: ZIP bundle with everything
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${bundleFilename}"`);
+    res.setHeader('X-Elara-Signature', session.signature.metaHash);
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    
+    archive.on('error', (err) => {
+      console.error('Archive error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to create bundle' });
+      }
+    });
+
+    // Pipe archive to response
+    archive.pipe(res);
+
+    // Add signed image
+    archive.append(session.signedImage, { name: imageFilename });
+
+    // Add sidecar JSON (pretty printed for readability)
+    archive.append(JSON.stringify(session.sidecar, null, 2), { name: sidecarFilename });
+
+    // Add README
+    const readme = generateReadme(imageFilename, sidecarFilename, session.signature.metaHash);
+    archive.append(readme, { name: 'README.txt' });
+
+    // Finalize
+    await archive.finalize();
+
+    // Schedule deletion
     setTimeout(() => deleteSession(sessionId), 60000);
   } catch (error) {
     console.error('Download error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 
+// Legacy sidecar endpoint (kept for backwards compatibility)
 router.get('/sidecar/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -61,11 +144,10 @@ router.get('/sidecar/:sessionId', async (req, res) => {
       return res.status(404).json({ error: 'Session not found or expired' });
     }
 
+    const sidecarFilename = session.originalName.replace(/\.[^.]+$/, '-sidecar.json');
+    
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${session.originalName.replace(/\.[^.]+$/, '-sidecar.json')}"`
-    );
+    res.setHeader('Content-Disposition', `attachment; filename="${sidecarFilename}"`);
 
     return res.json(session.sidecar);
   } catch (error) {
