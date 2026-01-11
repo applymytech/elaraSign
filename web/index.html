@@ -1005,21 +1005,12 @@
       fetchBuildId();
     });
 
-    // Download both image and sidecar with one click
-    function downloadBoth(imageUrl, sidecarUrl) {
-      // Download image
-      const a1 = document.createElement('a');
-      a1.href = imageUrl;
-      a1.download = '';
-      a1.click();
-      
-      // Download sidecar (slight delay to ensure both trigger)
-      setTimeout(() => {
-        const a2 = document.createElement('a');
-        a2.href = sidecarUrl;
-        a2.download = '';
-        a2.click();
-      }, 100);
+    // Download ZIP bundle with one click
+    function downloadBundle(bundleUrl) {
+      const a = document.createElement('a');
+      a.href = bundleUrl;
+      a.download = '';
+      a.click();
     }
 
     function showTab(tab) {
@@ -1110,8 +1101,8 @@
             <p><strong>Meta Hash:</strong> ${data.signature.metaHash}</p>
             <p><strong>Locations:</strong> ${data.signature.locations.join(', ')}</p>
             <p><strong>Version:</strong> ${data.signature.version}</p>
-            <button class="download-btn" onclick="downloadBoth('${data.downloadUrl}', '${data.sidecarUrl}')">⬇️ Download Signed ${fileType}</button>
-            <p class="download-note">Downloads image + sidecar JSON</p>
+            <button class="download-btn" onclick="downloadBundle('${data.downloadUrl}')">⬇️ Download Signed ${fileType}</button>
+            <p class="download-note">Downloads ZIP bundle (image + sidecar + README)</p>
             <pre>${JSON.stringify(data, null, 2)}</pre>
           `;
         } else {
