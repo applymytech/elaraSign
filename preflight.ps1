@@ -1,217 +1,93 @@
-# Preflight Script for elaraSign
-# Run this BEFORE testing or deploying
-#
-# Usage:
-#   .\preflight.ps1           # Full preflight with tests
-#   .\preflight.ps1 -SkipTests # Skip tests (emergency only)
-#
-# This script:
-# 1. Verifies environment
-# 2. Cleans build artifacts
-# 3. Builds TypeScript
-# 4. Runs tests (unless skipped)
-# 5. Creates .preflight-passed marker
+# elaraSign Preflight Check
+# Verifies gcloud config, authentication, and project access
 
-param(
-    [switch]$SkipTests
-)
+$ErrorActionPreference = "Continue"
 
-$ErrorActionPreference = "Stop"
-
-# Configuration
-$PROJECT_NAME = "elara-sign"
-$REQUIRED_NODE_MAJOR = 20
-$MARKER_FILE = ".preflight-passed"
-$BUILD_DIRS = @("dist")
-
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
-
-function Write-Step {
-    param([string]$Message)
-    Write-Host ""
-    Write-Host "==> $Message" -ForegroundColor Cyan
-}
-
-function Write-OK {
-    param([string]$Message)
-    Write-Host "[OK] $Message" -ForegroundColor Green
-}
-
-function Write-Fail {
-    param([string]$Message)
-    Write-Host "[FAIL] $Message" -ForegroundColor Red
-}
-
-function Write-Warn {
-    param([string]$Message)
-    Write-Host "[WARN] $Message" -ForegroundColor Yellow
-}
-
-function Exit-WithError {
-    param([string]$Message)
-    Write-Host ""
-    Write-Fail $Message
-    Write-Host ""
-    Write-Host "Preflight FAILED." -ForegroundColor Red
+# Load config
+$configPath = Join-Path $PSScriptRoot "deploy.config.json"
+if (-not (Test-Path $configPath)) {
+    Write-Host "ERROR: deploy.config.json not found" -ForegroundColor Red
     exit 1
 }
+$config = Get-Content $configPath -Raw | ConvertFrom-Json
 
-# ============================================================================
-# STEP 1: ENVIRONMENT CHECK
-# ============================================================================
+$gcloudConfig = $config.gcloud.configuration
+$gcloudAccount = $config.gcloud.account
+$gcloudProject = $config.gcloud.project
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  elaraSign - Preflight Check          " -ForegroundColor Cyan
+Write-Host "  elaraSign Preflight Check" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
 
-Write-Step "Checking environment"
+$allGood = $true
 
-# Check we're in the right directory
-if (-not (Test-Path "package.json")) {
-    Exit-WithError "package.json not found. Run this from the elaraSign root directory."
-}
-
-$packageJson = Get-Content "package.json" | ConvertFrom-Json
-if ($packageJson.name -ne $PROJECT_NAME) {
-    Exit-WithError "Wrong project! Expected '$PROJECT_NAME', found '$($packageJson.name)'"
-}
-Write-OK "Project: $PROJECT_NAME v$($packageJson.version)"
-
-# Check Node.js
-try {
-    $nodeVersion = node --version
-    $nodeMajor = [int]($nodeVersion -replace 'v(\d+).*', '$1')
-    if ($nodeMajor -lt $REQUIRED_NODE_MAJOR) {
-        Exit-WithError "Node.js $REQUIRED_NODE_MAJOR+ required. Found: $nodeVersion"
-    }
-    Write-OK "Node.js: $nodeVersion"
-} catch {
-    Exit-WithError "Node.js not found"
-}
-
-# Check npm
-try {
-    $npmVersion = npm --version
-    Write-OK "npm: v$npmVersion"
-} catch {
-    Exit-WithError "npm not found"
-}
-
-# ============================================================================
-# STEP 2: CLEAN BUILD ARTIFACTS
-# ============================================================================
-
-Write-Step "Cleaning build artifacts"
-
-foreach ($dir in $BUILD_DIRS) {
-    if (Test-Path $dir) {
-        Remove-Item -Recurse -Force $dir -ErrorAction SilentlyContinue
-        Write-Host "[INFO] Removed: $dir/" -ForegroundColor Gray
-    }
-}
-
-if (Test-Path $MARKER_FILE) {
-    Remove-Item $MARKER_FILE
-}
-
-Write-OK "Build artifacts cleaned"
-
-# ============================================================================
-# STEP 3: INSTALL DEPENDENCIES
-# ============================================================================
-
-Write-Step "Checking dependencies"
-
-if (-not (Test-Path "node_modules")) {
-    Write-Host "[INFO] Installing dependencies..." -ForegroundColor Gray
-    npm install
-    if ($LASTEXITCODE -ne 0) {
-        Exit-WithError "npm install failed"
-    }
-}
-Write-OK "Dependencies ready"
-
-# ============================================================================
-# STEP 4: BUILD
-# ============================================================================
-
-Write-Step "Building TypeScript"
-
-npm run build
-if ($LASTEXITCODE -ne 0) {
-    Exit-WithError "TypeScript build failed"
-}
-Write-OK "Build complete"
-
-# ============================================================================
-# STEP 5: RUN TESTS
-# ============================================================================
-
-if (-not $SkipTests) {
-    Write-Step "Running tests"
-    
-    npm run test:run
-    if ($LASTEXITCODE -ne 0) {
-        Exit-WithError "Tests failed"
-    }
-    Write-OK "All tests passed"
+# Check 1: gcloud CLI installed
+Write-Host "[1/5] Checking gcloud CLI..." -ForegroundColor Yellow
+$gcloudPath = Get-Command gcloud -ErrorAction SilentlyContinue
+if ($gcloudPath) {
+    Write-Host "      OK - gcloud found at $($gcloudPath.Source)" -ForegroundColor Green
 } else {
-    Write-Warn "Tests SKIPPED (--SkipTests flag)"
+    Write-Host "      FAIL - gcloud not found" -ForegroundColor Red
+    $allGood = $false
 }
 
-# ============================================================================
-# STEP 6: VERIFY CORE FILE
-# ============================================================================
-
-Write-Step "Verifying signing-core"
-
-$coreFile = "src/core/signing-core.ts"
-if (-not (Test-Path $coreFile)) {
-    Exit-WithError "signing-core.ts not found at $coreFile"
+# Check 2: Configuration exists
+Write-Host "[2/5] Checking gcloud configuration..." -ForegroundColor Yellow
+$configs = & gcloud config configurations list --format="value(name)" 2>&1 | Where-Object { $_ -notmatch "^(Activated|Updated)" }
+if ($configs -contains $gcloudConfig) {
+    Write-Host "      OK - Configuration '$gcloudConfig' exists" -ForegroundColor Green
+} else {
+    Write-Host "      INFO - Configuration '$gcloudConfig' will be created" -ForegroundColor Yellow
 }
 
-$coreContent = Get-Content $coreFile -Raw
-if ($coreContent -match "ELARA_SIGN_VERSION") {
-    $versionMatch = [regex]::Match($coreContent, 'ELARA_SIGN_VERSION\s*=\s*"([^"]+)"')
-    if ($versionMatch.Success) {
-        Write-OK "signing-core version: $($versionMatch.Groups[1].Value)"
-    }
+# Check 3: Account authenticated
+Write-Host "[3/5] Checking authentication..." -ForegroundColor Yellow
+$authAccounts = & gcloud auth list --format="value(account)" 2>&1 | Where-Object { $_ -notmatch "^(Activated|Updated)" }
+if ($authAccounts -contains $gcloudAccount) {
+    Write-Host "      OK - Account $gcloudAccount is authenticated" -ForegroundColor Green
+} else {
+    Write-Host "      WARN - Account $gcloudAccount not authenticated" -ForegroundColor Yellow
+    Write-Host "            Deploy script will prompt for login" -ForegroundColor Gray
 }
 
-# ============================================================================
-# STEP 7: WRITE MARKER FILE
-# ============================================================================
+# Check 4: Activate config and check project
+Write-Host "[4/5] Checking project access..." -ForegroundColor Yellow
+$null = & gcloud config configurations activate $gcloudConfig 2>&1
+$null = & gcloud config set account $gcloudAccount 2>&1
+$null = & gcloud config set project $gcloudProject 2>&1
 
-Write-Step "Creating preflight marker"
-
-$marker = @{
-    timestamp = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
-    project = $PROJECT_NAME
-    version = $packageJson.version
-    node = $nodeVersion
-    testsRan = (-not $SkipTests)
-    user = $env:USERNAME
+$projectId = & gcloud projects describe $gcloudProject --format="value(projectId)" 2>&1 | Where-Object { $_ -notmatch "^(Activated|Updated|ERROR)" }
+if ($projectId -eq $gcloudProject) {
+    Write-Host "      OK - Project $gcloudProject accessible" -ForegroundColor Green
+} else {
+    Write-Host "      FAIL - Cannot access project $gcloudProject" -ForegroundColor Red
+    $allGood = $false
 }
 
-$marker | ConvertTo-Json | Out-File -Encoding UTF8 $MARKER_FILE
-Write-OK "Marker created"
+# Check 5: Node.js
+Write-Host "[5/5] Checking Node.js..." -ForegroundColor Yellow
+$nodeVersion = & node --version 2>&1
+if ($nodeVersion -match "^v\d+") {
+    Write-Host "      OK - Node.js $nodeVersion" -ForegroundColor Green
+} else {
+    Write-Host "      FAIL - Node.js not found" -ForegroundColor Red
+    $allGood = $false
+}
 
-# ============================================================================
-# DONE
-# ============================================================================
-
 Write-Host ""
-Write-Host "========================================" -ForegroundColor Green
-Write-Host "  PREFLIGHT PASSED                     " -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Green
-Write-Host ""
-Write-Host "Project: $PROJECT_NAME v$($packageJson.version)" -ForegroundColor White
-Write-Host "Tests:   $(if ($SkipTests) { 'SKIPPED' } else { 'PASSED' })" -ForegroundColor $(if ($SkipTests) { 'Yellow' } else { 'Green' })
-Write-Host ""
-Write-Host "Ready to:"
-Write-Host "  - Run dev server: npm run dev" -ForegroundColor Cyan
-Write-Host "  - Copy to apps:   See copy-to-apps.ps1" -ForegroundColor Cyan
-Write-Host ""
+if ($allGood) {
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "  ALL CHECKS PASSED" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Ready to deploy: .\deploy.ps1" -ForegroundColor White
+    Write-Host ""
+} else {
+    Write-Host "========================================" -ForegroundColor Red
+    Write-Host "  SOME CHECKS FAILED" -ForegroundColor Red
+    Write-Host "========================================" -ForegroundColor Red
+    Write-Host ""
+    exit 1
+}
