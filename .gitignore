@@ -73,6 +73,9 @@ gcp-key*.json
 *.key
 *.p12
 
+# Certificate directory (auto-generated, contains secrets)
+certs/
+
 # ============================================================================
 # DEPLOYMENT STATE (local only)
 # ============================================================================

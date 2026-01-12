@@ -33,6 +33,13 @@ import sharp from "sharp";
 import { type AudioSigningMetadata, signAudio } from "../../core/audio-signing.js";
 import { type AccountabilityData, encryptAccountability, PLATFORM_CODES } from "../../core/forensic-crypto.js";
 import {
+	hashIpAddress,
+	type ProvenanceData,
+	type SignerInfo,
+	signPdfWithDigitalSignature,
+} from "../../core/pdf-digital-signature.js";
+import { buildWitnessMetadata, getServiceIdentity } from "../../core/service-identity.js";
+import {
 	createPromptHash,
 	createUserFingerprint,
 	type ElaraContentMetadata,
@@ -265,6 +272,7 @@ async function buildMetadata(
 		seed?: number;
 		creatorName?: string;
 		creatorEmail?: string;
+		contentType?: "image" | "document" | "audio" | "video";
 	},
 ): Promise<ElaraContentMetadata> {
 	const contentHash = await sha256Hex(contentBuffer);
@@ -285,7 +293,7 @@ async function buildMetadata(
 		generatedAt: new Date().toISOString(),
 		userFingerprint,
 		keyFingerprint: "cloud-public", // Cloud service uses a public key identifier
-		contentType: "image",
+		contentType: options.contentType || "image",
 		contentHash,
 		characterId: "elara-sign-service",
 		modelUsed: options.model || "unknown",
@@ -293,41 +301,6 @@ async function buildMetadata(
 		seed: options.seed,
 		// Store creator info in a custom field (will be hashed into signature)
 		creatorInfo: creatorInfo || undefined,
-	};
-}
-
-/**
- * Sign a PDF by embedding metadata in the file
- * Embeds signature in PDF info dictionary and as a comment
- */
-async function signPdf(
-	pdfBuffer: Buffer,
-	metadata: ElaraContentMetadata,
-): Promise<{ signedBuffer: Buffer; metaHash: string }> {
-	const metaHash = await sha256Hex(JSON.stringify(metadata));
-	const timestamp = new Date().toISOString();
-
-	// Create signature block
-	const signatureBlock = [
-		"%% ELARA_SIGN_START",
-		"%% Version: 2.0",
-		`%% MetaHash: ${metaHash}`,
-		`%% Generator: ${metadata.generator}`,
-		`%% Timestamp: ${timestamp}`,
-		"%% ELARA_SIGN_END",
-		"",
-	].join("\n");
-
-	// Find where to insert (after PDF header, before first object)
-	const pdfString = pdfBuffer.toString("latin1");
-	const headerEnd = pdfString.indexOf("\n", pdfString.indexOf("%PDF-")) + 1;
-
-	// Insert signature block after header
-	const signedPdf = pdfString.slice(0, headerEnd) + signatureBlock + pdfString.slice(headerEnd);
-
-	return {
-		signedBuffer: Buffer.from(signedPdf, "latin1"),
-		metaHash,
 	};
 }
 
@@ -427,6 +400,16 @@ router.post("/sign", handleUpload, async (req, res) => {
 			? req.body.method
 			: "ai";
 
+		// Determine content type from mimetype
+		const contentType: "image" | "document" | "audio" | "video" =
+			mimetype === "application/pdf"
+				? "document"
+				: mimetype.startsWith("audio/")
+					? "audio"
+					: mimetype.startsWith("video/")
+						? "video"
+						: "image";
+
 		// Build metadata with proper required fields
 		const metadata = await buildMetadata(buffer, {
 			generator: req.body.generator,
@@ -436,6 +419,7 @@ router.post("/sign", handleUpload, async (req, res) => {
 			seed: req.body.seed ? Number.parseInt(req.body.seed, 10) : undefined,
 			creatorName: req.body.creatorName,
 			creatorEmail: req.body.creatorEmail,
+			contentType,
 		});
 
 		// Build creator string for standard metadata
@@ -454,19 +438,65 @@ router.post("/sign", handleUpload, async (req, res) => {
 			creator: creatorDisplay,
 		};
 
-		// Handle PDF separately
+		// Handle PDF separately - with digital signature support
 		if (mimetype === "application/pdf") {
-			const { signedBuffer, metaHash } = await signPdf(buffer, metadata);
+			// Build signer info from request
+			// For public cloud: use provided name/email or defaults
+			// For integration: apps provide KYC-verified user data
+			const signerInfo: SignerInfo = {
+				name: req.body.signerName || req.body.creatorName || "Anonymous Signer",
+				email: req.body.signerEmail || req.body.creatorEmail || "anonymous@elarasign.org",
+				reason: req.body.reason || `${generationMethod.toUpperCase()} content - Provenance record`,
+				location: req.body.location || "elaraSign Cloud Service",
+				contactInfo: req.body.signerEmail || req.body.creatorEmail,
+			};
+
+			// Build provenance data
+			const provenanceData: ProvenanceData = {
+				method: generationMethod,
+				generator: metadata.generator,
+				model: metadata.modelUsed,
+				characterId: metadata.characterId,
+				userFingerprint: metadata.userFingerprint,
+				ipHash: hashIpAddress(getClientIP(req)),
+				platformCode: "elara-cloud",
+				userCode: req.body.userCode, // Optional user identification code
+			};
+
+			// Get service identity for PKCS#7 signing (if available)
+			let serviceIdentity: ReturnType<typeof getServiceIdentity> | null = null;
+			try {
+				serviceIdentity = getServiceIdentity();
+			} catch {
+				serviceIdentity = null;
+			}
+
+			// Build witness metadata
+			const witnessMetadata = serviceIdentity ? buildWitnessMetadata() : undefined;
+
+			// Sign PDF with digital signature
+			const result = await signPdfWithDigitalSignature(new Uint8Array(buffer), {
+				signer: signerInfo,
+				provenance: provenanceData,
+				// Use service certificate for PKCS#7 if available
+				p12Certificate: serviceIdentity?.p12Certificate,
+				p12Password: serviceIdentity?.p12Password,
+			});
 
 			const session = await createSession({
-				signedImage: signedBuffer,
+				signedImage: Buffer.from(result.signedPdf),
 				originalName: originalname,
 				signature: {
-					metaHash,
-					locations: ["pdf-header"],
+					metaHash: result.metaHash,
+					locations: ["pdf-info", "pdf-keywords", ...(result.hasPkcs7Signature ? ["pkcs7"] : [])],
 					timestamp: new Date().toISOString(),
 				},
-				metadata,
+				metadata: {
+					...metadata,
+					signer: signerInfo,
+					provenance: provenanceData,
+					witness: witnessMetadata,
+				},
 				mimeType: "application/pdf",
 			});
 
@@ -476,9 +506,16 @@ router.post("/sign", handleUpload, async (req, res) => {
 				sessionId: session.id,
 				downloadUrl: `/api/download/${session.id}`,
 				signature: {
-					metaHash,
-					locations: ["pdf-header"],
+					metaHash: result.metaHash,
+					contentHash: result.contentHash,
+					locations: ["pdf-info", "pdf-keywords", ...(result.hasPkcs7Signature ? ["pkcs7"] : [])],
 					version: "2.0",
+					hasPkcs7: result.hasPkcs7Signature,
+					signer: {
+						name: signerInfo.name,
+						email: signerInfo.email,
+					},
+					witness: witnessMetadata?.service,
 				},
 				expiresIn: "10 minutes",
 			});

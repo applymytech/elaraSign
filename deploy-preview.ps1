@@ -126,8 +126,15 @@ $null = & gcloud config set project $gcloudProject 2>&1
 # Verify auth
 $authList = & gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2>&1 | Where-Object { $_ -is [string] }
 if ($authList -notcontains $gcloudAccount) {
-    Write-Host "      Account not authenticated. Opening browser..." -ForegroundColor Yellow
-    & gcloud auth login $gcloudAccount
+    Write-Host "      Account $gcloudAccount not authenticated." -ForegroundColor Red
+    Write-Host "" 
+    Write-Host "      To authenticate, type this command:" -ForegroundColor White
+    Write-Host "" 
+    Write-Host "        gcloud auth login $gcloudAccount" -ForegroundColor Cyan
+    Write-Host "" 
+    Write-Host "      Then try again: .\deploy-preview.ps1" -ForegroundColor White
+    Write-Host "" 
+    exit 1
 }
 Write-Host "      OK - gcloud configured" -ForegroundColor Green
 

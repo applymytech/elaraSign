@@ -14,6 +14,12 @@
     "domain": "sign.yourdomain.com"
   },
   
+  "identity": {
+    "_comment": "Service identity for witness model - appears on signed documents",
+    "organizationName": "Your Organization Name",
+    "serviceEmail": "signing-service@yourdomain.com"
+  },
+  
   "banned": {
     "_comment": "Patterns that will BLOCK deployment if found in gcloud config",
     "patterns": [

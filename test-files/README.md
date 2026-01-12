@@ -7,26 +7,28 @@ These files are designed to test all supported signing formats.
 
 | File | Type | Size | Purpose |
 |------|------|------|---------|
-| `sample-ai-generated.png` | PNG | 1.3 MB | Gold standard - full 4-layer test |
-| `sample-ai-generated.jpg` | JPEG | 134 KB | EXIF injection, lossy format |
-| `sample-ai-generated.webp` | WebP | 1 MB | Lossless WebP |
+| `sample-ai-generated.png` | PNG | 1.3 MB | Gold standard - metadata embedding test |
+| `sample-ai-generated.jpg` | JPEG | 134 KB | EXIF injection |
+| `sample-ai-generated.webp` | WebP | 1 MB | WebP XMP metadata |
 | `sample-avatar.png` | PNG | 1.2 MB | Secondary PNG test |
 | `sample-small.png` | PNG | 109 KB | Minimum size handling |
-| `sample-document.pdf` | PDF | 1 KB | PDF signing |
-| `sample-audio.wav` | WAV | 172 KB | Audio metadata (future) |
-| `sample-video-short.mp4` | MP4 | 2.6 MB | Video sidecar (future) |
+| `sample-document.pdf` | PDF | 1 KB | PDF metadata signing |
+| `sample-audio.wav` | WAV | 172 KB | Audio metadata |
+| `sample-video-short.mp4` | MP4 | 2.6 MB | Video sidecar |
 | `sample-video-long.mp4` | MP4 | 5.4 MB | Large file handling |
 
 ## What Gets Tested
 
 | File Type | Signing Method | What's Verified |
 |-----------|---------------|-----------------|
-| **PNG** | 4-layer (Billboard, DNA, Spread, Forensic) | All layers, tamper detection, conversion survival |
-| **JPEG** | Billboard (EXIF) + DNA + Spread | Signed but LSB lost (expected - lossy format) |
-| **WebP** | DNA (lossless) | Signature survives lossless WebP |
-| **PDF** | PDF comments + /Info dictionary | Signature block in PDF |
-| **WAV** | INFO chunks | Metadata in RIFF INFO (API pending) |
-| **MP4** | Sidecar (.elara.json) | External manifest (API pending) |
+| **PNG** | PNG tEXt chunks + EXIF | Metadata survives basic editing |
+| **JPEG** | EXIF metadata | Metadata survives basic editing |
+| **WebP** | XMP metadata | Metadata survives lossless WebP |
+| **PDF** | Document properties | Author, Creator, timestamps |
+| **WAV** | INFO chunks | Metadata in RIFF INFO |
+| **MP4** | Sidecar (.elara.json) | External JSON manifest |
+
+**Note:** Metadata does NOT survive screenshot or re-encoding. Keep sidecar JSON for reliable provenance.
 
 ## Shipping These Files
 

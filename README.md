@@ -1,108 +1,196 @@
 # elaraSign
 
-**Content Provenance Standard + Public Signing Service**
+**Content Provenance Standard + Sovereign Signing Service**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Cloud Run](https://img.shields.io/badge/GCP-Cloud%20Run-4285F4?logo=google-cloud)](https://cloud.google.com/run)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)](https://www.typescriptlang.org/)
 
-**Live Service**: [sign.openelara.org](https://sign.openelara.org)
+**Public Service**: [sign.openelara.org](https://sign.openelara.org)
 
 ---
 
-## What is elaraSign?
+> ⚡ **CONCEPT DEMONSTRATION** — This is a proof-of-concept showing how AI content provenance *should* work: **sovereign, secure, and accountable**. Use at your own risk. Fork it, make your own version, share improvements with the world.
 
-elaraSign is a **content provenance standard** that embeds generation metadata into files. It answers the question: *"How was this content created?"*
+---
 
-### 4-Layer Protection
+## 🎯 What is elaraSign?
 
-| Layer | Name | Technique | Survives |
-|-------|------|-----------|----------|
-| 1 | **Billboard** | EXIF/PNG metadata | Basic sharing (easily stripped) |
-| 2 | **DNA** | LSB steganography | Lossless only |
-| 3 | **The Spread** | DCT spread spectrum | **JPEG, screenshots, cropping** |
-| 4 | **Forensic** | AES-256 encrypted | Same as The Spread |
+elaraSign is a **content provenance standard** that embeds generation metadata into files. It answers: *"How was this content created, and who witnessed it?"*
 
-See [Full Architecture Docs](docs/WATERMARK_ARCHITECTURE.md)
+### Use It Three Ways
 
-### The Standard
+| Mode | For | How |
+|------|-----|-----|
+| 🌐 **Public Service** | Everyone | Use [sign.openelara.org](https://sign.openelara.org) - free, instant |
+| 🖥️ **Your Own Cloud** | Organizations | Deploy your own instance on GCP (~$5/month) |
+| 📦 **Embed in Code** | Developers | Copy `signing-core.ts` into your project |
+
+---
+
+## 🚀 Deploy Your Own Instance (15 Minutes)
+
+**Requirements:** Google account + payment method (GCP free tier covers most usage)
+
+### Total Cost Estimate
+
+| Usage | Monthly Cost |
+|-------|--------------|
+| Light (< 1000 requests) | **Free** (within GCP free tier) |
+| Medium (1000-10000 requests) | ~$5-15 |
+| Heavy (10000+ requests) | ~$20-50 |
+
+*Cloud Run charges only when your service is processing requests. No traffic = no cost.*
+
+### Step 1: Run the Setup Wizard
+
+```powershell
+.\first-time-setup.ps1
+```
+
+The wizard will:
+- ✅ Check Node.js, npm, gcloud CLI are installed
+- ✅ Guide you through GCP project setup
+- ✅ Let you pick your cloud region (🇺🇸 US, 🇪🇺 EU, 🇦🇺 Australia, etc.)
+- ✅ Configure your organization identity
+- ✅ Generate a signing certificate
+- ✅ Tell you exactly what to do next
+
+### Step 2: Deploy
+
+```powershell
+.\deploy.ps1
+```
+
+**That's it.** Your sovereign signing service is live at `https://your-project.run.app`
+
+### What You Get
+
+- 🔐 **Your own certificate** - Signatures trace back to YOUR organization
+- 🌍 **Your chosen region** - Data stays where you need it
+- 📊 **Your own logs** - Full audit trail in GCP
+- 🎨 **Your own branding** - Customize the web UI
+- 💰 **Your own costs** - Only pay for what you use
+
+---
+
+## 📦 Embed in Your Application
+
+Don't want a cloud service? Just copy the signing code directly into your project.
+
+### Option A: Copy the Core Module
+
+```powershell
+# Copy to your project
+Copy-Item "src/core/signing-core.ts" "your-project/src/lib/"
+```
+
+Then use it:
+
+```typescript
+import { signImage, verifyImage } from './lib/signing-core';
+
+// Sign an image
+const signed = await signImage(imageBuffer, {
+  method: 'ai',
+  generator: 'my-app',
+  model: 'stable-diffusion-xl',
+  userFingerprint: sha256(userId),
+  platformCode: 'my-platform'
+});
+
+// Verify an image
+const result = await verifyImage(imageBuffer);
+if (result.isValid) {
+  console.log(`Signed by: ${result.metadata.generator}`);
+  console.log(`Method: ${result.metadata.method}`);
+}
+```
+
+### Option B: Webhook Integration
+
+Call our public API (or your own instance) from any language:
+
+```bash
+# Sign an image
+curl -X POST https://sign.openelara.org/api/sign \
+  -F "file=@image.png" \
+  -F "method=ai" \
+  -F "generator=my-app"
+
+# Verify an image  
+curl -X POST https://sign.openelara.org/api/verify \
+  -F "file=@signed-image.png"
+```
+
+### Option C: Self-Hosted API
+
+Run elaraSign locally as a signing service for your application:
+
+```bash
+npm run dev  # Starts on http://localhost:3010
+```
+
+Your app calls `localhost:3010/api/sign` - works offline, no external dependencies.
+
+📖 **Full integration guide**: [docs/INTEGRATION_GUIDE.md](docs/INTEGRATION_GUIDE.md)
+
+---
+
+## 🛡️ What elaraSign Actually Does
+
+### Metadata-Based Provenance
+
+elaraSign embeds provenance information into file metadata. This is **transparent tracking**, not invisible watermarking.
+
+| Content Type | Embedding Method | Verification |
+|--------------|------------------|---------------|
+| **Images** | EXIF/PNG tEXt chunks | EXIF viewers, elaraSign verifier |
+| **PDF** | Document properties + optional visual stamp | PDF readers, EXIF tools |
+| **Audio** | ID3 tags (MP3), INFO chunks (WAV) | Audio metadata tools |
+| **Video** | Sidecar JSON manifest | elaraSign verifier |
+
+### What Gets Embedded
 
 Every signed file contains:
 - **Generation Method**: `ai`, `human`, `mixed`, `unknown`
 - **Generator**: Which tool/app created it
-- **Timestamp**: When it was created
-- **Integrity Hash**: Proof content hasn't been modified
-- **Forensic Data**: Encrypted accountability (IP, fingerprint) - operator only
+- **Timestamp**: When it was created (ISO 8601)
+- **Content Hash**: SHA-256 fingerprint of original content
+- **Witness Info**: Which service signed it, from where
+- **Sidecar Bundle**: Full JSON manifest (always preserved)
 
 ---
 
-## Brutal Honesty
+## 🎯 Brutal Honesty
 
-### What SURVIVES (The Spread layer):
-- JPEG compression (>50% quality)
-- Screenshots
-- Cropping
-- Social media upload
-- Format conversion
+### What WORKS:
+- ✅ Metadata embedding (EXIF, PNG chunks, PDF properties)
+- ✅ Sidecar JSON bundles (100% reliable, can't be stripped without intent)
+- ✅ Visual watermarks (optional, configurable)
+- ✅ Survives basic editing (Paint, Preview, etc.)
+- ✅ Survives renaming, moving, copying
+- ✅ Verification via EXIF tools and elaraSign verifier
 
-### What DOES NOT survive:
-- Heavy blur or noise
-- Extreme compression (<50% JPEG)
-- Rotation/perspective transforms
-- AI regeneration (img2img)
-- Print and re-scan
-- Dedicated removal attacks
+### What DOESN'T Work:
+- ❌ Metadata stripped by screenshot (re-encoding)
+- ❌ Metadata stripped by social media upload (re-compression)
+- ❌ Not recognized as "Digital Signature" by Windows/Adobe (that requires PKI certificates)
+- ❌ Can be intentionally stripped (metadata removal tools)
 
-**This is a deterrent and accountability system, not magic.**
+### What This Means
 
-### The Service
+**elaraSign is a provenance record, not a tamper-proof seal.**
 
-This repository provides a **free public signing service** at [sign.openelara.org](https://sign.openelara.org):
-- Upload an image -> Get it signed with provenance metadata
-- Upload a signed image -> Verify its authenticity and view metadata
+- If someone has a signed file + sidecar → provenance is verifiable
+- If someone takes a screenshot → metadata is lost (sidecar still works if kept)
+- If someone intentionally strips metadata → they're destroying evidence (suspicious)
 
----
-
-## Getting Started
-
-### First Time? Run the Setup Wizard
-
-```powershell
-# Option 1: Run directly
-.\first-time-setup.ps1
-
-# Option 2: Or use npm
-npm run setup
-```
-
-The wizard will:
-- Check if Node.js, npm, and optional tools are installed
-- Give you clear instructions if anything is missing
-- Install dependencies (npm install)
-- Help you configure deployment (optional)
-- Tell you exactly what to do next
-
-### Quick Start (Experienced Developers)
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/openelara/elara-sign.git
-cd elara-sign
-
-# 2. Install dependencies  
-npm install
-
-# 3. Run locally
-npm run dev
-
-# Opens at http://localhost:3010
-```
-
-### That's It!
-
-You now have a local signing service. Upload images, sign them, verify them. The web UI explains everything.
+**This is an accountability system for good actors, not a cage for bad actors.**
 
 ---
 
-## Why This Matters
+## 💡 Why This Matters
 
 ```
 TODAY: Anyone can claim any image is real or AI-generated. No proof either way.
@@ -116,57 +204,61 @@ WITH ELARASIGN: Generation method is embedded at creation time.
 
 elaraSign doesn't detect AI images - it **records provenance at generation time**.
 
-- AI generators that adopt elaraSign -> Always signed as AI
-- Human artists can sign their work -> Proves human creation
-- Bad actors can still lie -> But they can't forge a legitimate signature
-- Goal: Make signing ubiquitous, so unsigned = suspicious
+- ✅ AI generators that adopt elaraSign → Always signed as AI
+- ✅ Human artists can sign their work → Proves human creation  
+- ⚠️ Bad actors can still lie → But they can't forge a legitimate signature
+- 🎯 Goal: Make signing ubiquitous, so unsigned = suspicious
 
 **When image APIs adopt this standard, the problem solves itself.**
 
 ---
 
-## Supported Content
+## 📄 PDF Signing
 
-| Type | Status | Layers | Notes |
-|------|--------|--------|-------|
-| **Images** | Ready | 4-layer (Billboard, DNA, Spread, Forensic) | PNG, JPEG, WebP - full spread-spectrum watermarking |
-| **PDF** | Ready | 3-layer (/Info, XMP, Hidden Annotation) | Professional metadata signing |
-| **Audio** | Ready | Surface metadata (ID3, INFO chunks) | MP3, WAV - no spread-spectrum |
-| **Video** | Scaffold | Sidecar manifest + container metadata | Sidecar works now, full signing future |
+elaraSign embeds provenance metadata into PDF document properties. This records WHO witnessed the document and WHEN.
 
----
+### What You Get
 
-## How It Works
+| Feature | Description |
+|---------|-------------|
+| 📋 **Metadata Embedding** | Author, Creator, timestamps in PDF properties |
+| 🔍 **EXIF Verification** | Detectable by metadata tools and elaraSign verifier |
+| 🏛️ **Witness Model** | Service records it witnessed the document |
+| 📦 **Sidecar Bundle** | Full JSON manifest for complete provenance |
 
-### Signing (v2.0 Standard)
+### Current Status vs Future
 
-1. **Metadata created**: Generation method, timestamp, model, etc.
-2. **Hashes computed**: Content hash + metadata hash (SHA-256)
-3. **Signature embedded**: 48-byte compact binary in 3 locations
-4. **PNG chunks added**: Full metadata in standard PNG text chunks
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Metadata embedding | ✅ Works | Detectable by EXIF tools, elaraSign |
+| Visual stamp | ✅ Works | Optional "Signed by elaraSign" watermark |
+| PKCS#7 digital signature | 🔜 Roadmap | For Adobe/Windows recognition |
+| CA-signed certificates | 🔜 Roadmap | For trusted certificate chain |
 
-### Multi-Location Redundancy
+### Honest Assessment
 
-```
-+------+---------------------------------+------+
-| LOC1 |                                 | LOC2 |
-| TL   |                                 | TR   |
-+------+                                 +------+
-|                                               |
-|              YOUR IMAGE                       |
-|                                               |
-+-----------------+------+---------------------+
-|                 | LOC3 |                     |
-|                 | BC   |                     |
-+-----------------+------+---------------------+
+**Current state**: elaraSign adds metadata to PDFs. This is verifiable by EXIF tools and our verifier, but NOT recognized as a "Digital Signature" by Adobe Reader or Windows (those require PKCS#7 cryptographic signatures with certificate chains).
 
-Any ONE location surviving = Valid signature
-Trolls must crop ALL THREE corners to remove provenance
-```
+**Roadmap**: True PKCS#7 digital signatures with proper certificate support is a future enhancement. When implemented, signatures would appear in Adobe Reader's signature panel.
+
+📜 **Full legal notice**: [docs/LEGAL_NOTICE.md](docs/LEGAL_NOTICE.md)
 
 ---
 
-## API Reference
+## 📋 Supported Content
+
+| Type | Status | What We Do | Verification |
+|------|--------|------------|---------------|
+| **Images** | ✅ Ready | EXIF/PNG metadata + sidecar JSON | EXIF tools, elaraSign verifier |
+| **PDF** | ✅ Ready | Document properties + sidecar JSON | EXIF tools, elaraSign verifier |
+| **Audio** | ✅ Ready | ID3/INFO metadata + sidecar JSON | Audio metadata tools |
+| **Video** | ✅ Ready | Sidecar JSON manifest | elaraSign verifier |
+
+**All content types also get a sidecar JSON bundle** - the most reliable provenance record.
+
+---
+
+## 🔧 API Reference
 
 ### Sign an Image
 
@@ -179,6 +271,16 @@ generator: "my-app" (optional)
 method: "ai" | "human" | "mixed" (optional, default: "ai")
 ```
 
+**Response:**
+```json
+{
+  "success": true,
+  "sessionId": "abc123",
+  "downloadUrl": "/api/download/abc123",
+  "sidecarUrl": "/api/sidecar/abc123"
+}
+```
+
 ### Verify an Image
 
 ```bash
@@ -186,6 +288,24 @@ POST /api/verify
 Content-Type: multipart/form-data
 
 file: <image file>
+```
+
+**Response:**
+```json
+{
+  "isValid": true,
+  "metadata": {
+    "method": "ai",
+    "generator": "my-app",
+    "timestamp": "2025-01-15T10:30:00.000Z",
+    "contentHash": "abc123..."
+  },
+  "witness": {
+    "serviceName": "elaraSign",
+    "region": "us-central1",
+    "country": "🇺🇸 United States"
+  }
+}
 ```
 
 ### Download Signed Image
@@ -200,128 +320,104 @@ GET /api/download/:sessionId
 GET /api/sidecar/:sessionId
 ```
 
+### Health Check
+
+```bash
+GET /health
+```
+
+Returns service status, region, and identity information.
+
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 elaraSign/
   src/
-    core/           # THE signing standard (portable)
-      signing-core.ts       # Image signing (4-layer)
-      pdf-signing.ts        # PDF signing
+    core/           # THE signing standard (portable - copy to your projects)
+      signing-core.ts       # Image signing (metadata) ⭐ COPY THIS
+      pdf-signing.ts        # PDF metadata signing
       audio-signing.ts      # Audio signing (MP3/WAV)
-      video-signing.ts      # Video signing (scaffold)
+      video-signing.ts      # Video signing (sidecar)
+      service-identity.ts   # Witness identity management
+      region-mapping.ts     # GCP region → country mapping
     cloud/          # Cloud Run service
       server.ts
       routes/
-    testing/        # Test runner and helpers
-      test-runner.ts        # API-based testing
-      helper.ts             # Diagnostics
-    local/          # CLI tool (future)
-  web/              # Demo UI
-  deploy/           # Cloud Run deployment
+    testing/        # Test infrastructure
+  web/              # Demo UI (customize for your branding)
+  deploy/           # Deployment configuration
 ```
 
-### Code Flow
+### How It Works (v2.0 Standard)
+
+1. **Metadata created**: Generation method, timestamp, model, witness info
+2. **Hashes computed**: Content hash + metadata hash (SHA-256)
+3. **Metadata embedded**: Full provenance in EXIF/PNG chunks
+4. **Sidecar generated**: JSON manifest with complete provenance record
+5. **Witness recorded**: Service identity + geographic location
+
+### Metadata Survival
+
+Metadata survives basic editing (Paint, Preview, rename, copy) but is lost when files are re-encoded (screenshot, social media upload). The sidecar JSON bundle is always reliable if kept with the file.
+
+### Code Flow (Copy, Don't Import)
 
 ```
-elaraSign/src/core/signing-core.ts  <- CANONICAL SOURCE (images)
-elaraSign/src/core/pdf-signing.ts   <- PDF signing
-elaraSign/src/core/audio-signing.ts <- Audio signing
-    |
-    | COPY to (not import):
-    |
-    +---> openElara Desktop (src/lib/)
-    +---> openElaraCloud (src/lib/)
+elaraSign/src/core/signing-core.ts  ← CANONICAL SOURCE
+    │
+    │ COPY to (not npm install):
+    │
+    ├──→ openElara/src/lib/signing-core.ts
+    ├──→ openElaraCloud/src/lib/signing-core.ts  
+    └──→ YOUR PROJECT/src/lib/signing-core.ts
 ```
+
+Each project has its **own copy**. No external dependencies.
 
 ---
 
-## Development
+## 🧪 Development
 
 ### Local Development
 
 ```bash
-npm run dev           # Start server with hot-reload at http://localhost:3010
+npm install         # Install dependencies
+npm run dev         # Start server at http://localhost:3010
 ```
 
 ### Testing
 
-Tests require API keys because they call real AI APIs to generate content,
-sign it, and verify the signatures work end-to-end.
-
 ```bash
-# See all test options
-npm run test:help
-
-# Run tests with Together.ai (generates real TTS audio, signs it, verifies)
-npm run test -- --together-key=YOUR_KEY
-
-# Run with multiple providers
-npm run test -- --together-key=xxx --openai-key=yyy
-
-# With Exa for error diagnosis if tests fail
-npm run test -- --together-key=xxx --exa-key=zzz
+npm test            # Run all tests (uses local signing, no API keys needed)
 ```
 
-**Get API keys:**
-- Together.ai: https://api.together.xyz/settings/api-keys (free tier available)
-- OpenAI: https://platform.openai.com/api-keys
-- Exa (optional): https://dashboard.exa.ai/api-keys
-
-**Your API keys are secure:**
-- Passed via CLI or env vars only
-- Used only during test runtime  
-- Never written to disk or logs
-
-**What gets tested:**
-1. Generate audio via Together.ai or OpenAI TTS API
-2. Sign that audio with elaraSign
-3. Verify signature is readable and metadata is correct
-4. Artifacts saved to test-output/ (playable audio files)
-
-### Helper Commands
+For integration tests with real AI providers:
 
 ```bash
-npm run helper:status     # View recent test runs
-npm run helper:diagnose   # Analyze failures with solutions
-npm run helper -- explain --error="401 Unauthorized"
+npm run test -- --together-key=YOUR_KEY  # Test with Together.ai TTS
 ```
 
-### Cloud Deployment
-
-First time deploying? Run these in order:
+### Certificate Setup (For Production)
 
 ```powershell
-.\preflight.ps1       # Check gcloud is configured correctly
-.\deploy.ps1          # Build, test, and deploy to Cloud Run
+.\setup-certificate.ps1   # Generates P12, uploads to Secret Manager
+```
+
+### Deployment Checklist
+
+```powershell
+.\preflight.ps1           # Verify gcloud is configured
+.\deploy.ps1              # Build, test, deploy to Cloud Run
+.\deploy-status.ps1       # Check deployment status
 ```
 
 See [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) for detailed instructions.
 
 ---
 
-## Technical Details
-
-### Signing Format: v2.0
-
-- **48-byte compact binary** embedded in image pixels
-- **3 locations**: top-left, top-right, bottom-center
-- **Crop-resilient**: Any 1 location surviving = valid signature
-- **Metadata**: content hash, meta hash, timestamp, generator, method
-
-### Supported Formats
-
-| Format | Sign | Verify | Notes |
-|--------|------|--------|-------|
-| PNG | Yes | Yes | Full support |
-| JPEG | Yes | Yes | Lossy compression may degrade some locations |
-| WebP | Yes | Yes | Full support |
-
----
-
-## Part of the Elara Universe
+## 🌍 Part of the Elara Universe
 
 | Project | Type | Signing |
 |---------|------|---------|
@@ -329,14 +425,53 @@ See [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) for detailed instructio
 | **openElara** | Desktop App | Embedded signing |
 | **openElaraCloud** | Cloud App | Embedded signing |
 
-All projects use **identical copies** of `signing-core.ts` - this repo is the source of truth.
+All projects use **identical copies** of the signing core - this repo is the source of truth.
 
 ---
 
-## License
+## 📜 License & Philosophy
 
-MIT License - Use this standard freely. The more adoption, the better for everyone.
+**MIT License** (Freeware/Shareware) - see [LICENSE](LICENSE) file.
+
+### The Vision
+
+This is **my version** of how AI content provenance should work. These are "rules from Heaven" - principles I believe should guide how AI-generated content is handled:
+
+- **Sovereign**: You control your own signing infrastructure
+- **Secure**: Cryptographic proof of provenance
+- **Accountable**: Generation method recorded at creation time
+
+### For Everyone
+
+- ✅ **Free to use** - Use this standard, improve it, share it
+- ✅ **Fork encouraged** - Make your own version, customize it
+- ✅ **Bug fixes welcome** - Share improvements with the community
+
+### Commercial Licensing
+
+Building elaraSign into a commercial product? Contact for licensing inquiries:
+
+📧 **openelara@applymytech.ai**
+
+This email is also available for written confirmation of the freeware/shareware license terms.
 
 ---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Run tests (`npm test`)
+4. Commit changes (`git commit -m 'Add amazing feature'`)
+5. Push to branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
+
+---
+
+<div align="center">
 
 *"Transparency is not optional. It's the foundation of trust."*
+
+**[sign.openelara.org](https://sign.openelara.org)** | **[GitHub](https://github.com/applymytech/elaraSign)**
+
+</div>

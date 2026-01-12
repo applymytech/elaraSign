@@ -144,7 +144,7 @@ if ($currentProject -eq $ProjectId) {
 
 # Check not using banned projects
 Write-Check "Not using banned project"
-$bannedProjects = @("phillabor-crm", "openelaracrm", "applied-ai-assistant")
+$bannedProjects = @("openelaracrm", "applied-ai-assistant")
 if ($currentProject -in $bannedProjects) {
     Write-Issue "Using banned project: $currentProject" "Switch to elarasign-prod"
 } else {

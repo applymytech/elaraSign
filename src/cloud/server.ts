@@ -16,6 +16,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express, { type NextFunction, type Request, type Response } from "express";
+import { getServiceIdentity, initServiceIdentity } from "../core/service-identity.js";
 import { downloadRoutes } from "./routes/download.js";
 import { signRoutes } from "./routes/sign.js";
 import { verifyRoutes } from "./routes/verify.js";
@@ -150,12 +151,27 @@ app.get("/", (_req, res) => {
 
 // Health check (bypasses rate limiting)
 app.get("/api/health", (_req, res) => {
+	let identity: ReturnType<typeof getServiceIdentity> | null = null;
+	try {
+		identity = getServiceIdentity();
+	} catch {
+		identity = null;
+	}
+
 	res.json({
 		status: "ok",
 		version: "2.0.0",
 		uptime: process.uptime(),
 		memory: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
 		timestamp: new Date().toISOString(),
+		witness: identity
+			? {
+					organization: identity.config.organizationName,
+					location: identity.deploy.region.displayName,
+					country: identity.deploy.region.country,
+					pkcs7Enabled: identity.canSignPkcs7,
+				}
+			: undefined,
 	});
 });
 
@@ -235,17 +251,25 @@ app.use((req, res) => {
 // START SERVER
 // ============================================================================
 
-const server = app.listen(PORT, () => {
-	console.log(`🔐 elaraSign server running on http://localhost:${PORT}`);
-	console.log(`   Health: http://localhost:${PORT}/api/health`);
-	console.log(`   Demo:   http://localhost:${PORT}/`);
+// Initialize service identity before starting
+initServiceIdentity()
+	.then(() => {
+		const server = app.listen(PORT, () => {
+			console.log(`🔐 elaraSign server running on http://localhost:${PORT}`);
+			console.log(`   Health: http://localhost:${PORT}/api/health`);
+			console.log(`   Demo:   http://localhost:${PORT}/`);
 
-	// Start session cleanup job
-	sessionCleanup.start();
-});
+			// Start session cleanup job
+			sessionCleanup.start();
+		});
 
-// Set server timeouts
-server.timeout = 120000; // 2 minutes max request time
-server.keepAliveTimeout = 65000; // Slightly more than ALB timeout
+		// Set server timeouts
+		server.timeout = 120000; // 2 minutes max request time
+		server.keepAliveTimeout = 65000; // Slightly more than ALB timeout
+	})
+	.catch((err) => {
+		console.error("❌ Failed to initialize service identity:", err);
+		process.exit(1);
+	});
 
 export { app };

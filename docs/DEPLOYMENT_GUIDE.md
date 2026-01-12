@@ -10,7 +10,6 @@ Domain:        sign.openelara.org
 Region:        us-central1
 Service:       elara-sign
 
-⛔ BANNED: phillabor, operations@phillabor.com, phillabor-crm-*
 ```
 
 ---
@@ -21,9 +20,8 @@ Service:       elara-sign
 
 | Config | Account | Project | Purpose |
 |--------|---------|---------|---------|
-| `default` | operations@phillabor.com | phillabor-crm-a8447 | PhilLabor (SEPARATE!) |
-| `openelara` | gservices@applymytech.ai | openelaracloud | OpenElara Cloud app |
 | `elarasign` | gservices@applymytech.ai | elarasign-prod | elaraSign service |
+| `openelara` | gservices@applymytech.ai | openelaracloud | OpenElara Cloud app |
 
 ### ALWAYS activate the right config before working:
 
@@ -33,9 +31,6 @@ gcloud config configurations activate elarasign
 
 # For openElaraCloud work:
 gcloud config configurations activate openelara
-
-# For PhilLabor work (completely separate!):
-gcloud config configurations activate default
 ```
 
 ---
@@ -50,7 +45,6 @@ gcloud config configurations activate default
 |---------|------|---------|
 | `openelaracloud` | Firebase + GCP | Cloud AI assistant (your main app) |
 | `elarasign-prod` | GCP only (no Firebase) | Content provenance signing service |
-| `phillabor-crm-*` | ⛔ SEPARATE | PhilLabor - DO NOT MIX |
 
 ### Why separate projects?
 

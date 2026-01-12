@@ -62,8 +62,15 @@ $authAccounts = & gcloud auth list --format="value(account)" 2>&1 | Where-Object
 if ($authAccounts -contains $gcloudAccount) {
     Write-Host "      OK - Account $gcloudAccount is authenticated" -ForegroundColor Green
 } else {
-    Write-Host "      WARN - Account $gcloudAccount not authenticated" -ForegroundColor Yellow
-    Write-Host "            Deploy script will prompt for login" -ForegroundColor Gray
+    Write-Host "      FAIL - Account $gcloudAccount not authenticated" -ForegroundColor Red
+    Write-Host "" 
+    Write-Host "      To authenticate, type this command:" -ForegroundColor White
+    Write-Host "" 
+    Write-Host "        gcloud auth login $gcloudAccount" -ForegroundColor Cyan
+    Write-Host "" 
+    Write-Host "      Then run preflight again: .\preflight.ps1" -ForegroundColor White
+    Write-Host "" 
+    exit 1
 }
 
 # Check 4: Activate config and check project
