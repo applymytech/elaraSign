@@ -233,9 +233,7 @@ function detectFileType(filePath: string, buffer: Buffer): VerificationReport["t
 
 async function verifyImage(buffer: Buffer, report: VerificationReport, _verbose: boolean): Promise<void> {
 	const sharp = (await import("sharp")).default;
-	const { hasElaraSignature, readSignature, verifyImageContent, hasAnyElaraSignature } = await import(
-		"../core/signing-core.js"
-	);
+	const { hasElaraSignature, readSignature, verifyImageContent } = await import("../core/signing-core.js");
 	const { extractSpreadSpectrum } = await import("../core/spread-spectrum.js");
 
 	// Get image dimensions and raw pixel data
@@ -395,7 +393,7 @@ async function verifyPdf(buffer: Buffer, report: VerificationReport, _verbose: b
 // ============================================================================
 
 async function verifyAudio(buffer: Buffer, report: VerificationReport, _verbose: boolean): Promise<void> {
-	const { verifyAudio: verifyAudioCore, detectAudioFormat } = await import("../core/audio-signing.js");
+	const { verifyAudio: verifyAudioCore } = await import("../core/audio-signing.js");
 
 	const result = await verifyAudioCore(new Uint8Array(buffer));
 

@@ -19,9 +19,9 @@
     "helper": "tsx src/testing/helper.ts",
     "helper:status": "tsx src/testing/helper.ts status",
     "helper:diagnose": "tsx src/testing/helper.ts diagnose",
-    "lint": "biome check src/",
-    "lint:fix": "biome check --write src/",
-    "format": "biome format --write src/"
+    "lint": "biome check src/ web/",
+    "lint:fix": "biome check --write src/ web/",
+    "format": "biome format --write src/ web/"
   },
   "keywords": [
     "image-signing",

@@ -94,7 +94,7 @@ if ($nodeVersion -match "^v\d+") {
 Write-Host "[6/7] Checking dependencies..." -ForegroundColor Yellow
 if (-not (Test-Path (Join-Path $PSScriptRoot "node_modules"))) {
     Write-Host "      Installing dependencies..." -ForegroundColor Yellow
-    $npmInstall = & npm install 2>&1
+    $null = & npm install 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Host "      FAIL - npm install failed" -ForegroundColor Red
         $allGood = $false
@@ -105,9 +105,32 @@ if (-not (Test-Path (Join-Path $PSScriptRoot "node_modules"))) {
     Write-Host "      OK - node_modules exists" -ForegroundColor Green
 }
 
-# Check 7: TypeScript compiles (THE TRUTHFULNESS CHECK)
+# Check 7: Biome linting (CATCHES CODE QUALITY ISSUES)
+# TRUTHFULNESS: Check for BOTH errors AND warnings - no false success
+Write-Host "[7/8] Running Biome linter..." -ForegroundColor Yellow
+$lintOutput = & npm run lint 2>&1
+$lintOutputStr = $lintOutput -join "`n"
+
+# Check for warnings too - "Found X warnings" means issues exist
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "      FAIL - Biome found errors:" -ForegroundColor Red
+    $lintOutput | Select-Object -Last 15 | ForEach-Object {
+        Write-Host "            $_" -ForegroundColor Red
+    }
+    $allGood = $false
+} elseif ($lintOutputStr -match "Found \d+ warnings?") {
+    Write-Host "      FAIL - Biome found warnings (must be zero):" -ForegroundColor Red
+    $lintOutput | Select-Object -Last 15 | ForEach-Object {
+        Write-Host "            $_" -ForegroundColor Red
+    }
+    $allGood = $false
+} else {
+    Write-Host "      OK - Biome lint passed (0 errors, 0 warnings)" -ForegroundColor Green
+}
+
+# Check 8: TypeScript compiles (THE TRUTHFULNESS CHECK)
 # This is CRITICAL - preflight must not pass if code doesn't build
-Write-Host "[7/7] Verifying TypeScript compiles..." -ForegroundColor Yellow
+Write-Host "[8/8] Verifying TypeScript compiles..." -ForegroundColor Yellow
 $buildOutput = & npm run build 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "      FAIL - TypeScript build failed:" -ForegroundColor Red

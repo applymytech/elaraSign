@@ -145,6 +145,40 @@
     }
 
     /* ============================================
+       SUB-TABS (File Type Selector)
+    ============================================ */
+    .subtabs {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .subtabs.hidden { display: none; }
+
+    .subtab {
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.5);
+      cursor: pointer;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .subtab:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .subtab.active {
+      background: rgba(168, 85, 247, 0.15);
+      border-color: rgba(168, 85, 247, 0.3);
+      color: #a855f7;
+    }
+
+    /* ============================================
        PANEL (Glass Card)
     ============================================ */
     .panel {
@@ -773,125 +807,193 @@
       <span class="forensic-status" id="forensic-status">⏳ Checking forensic status...</span>
     </header>
 
-    <!-- Tabs -->
+    <!-- Main Tabs -->
     <div class="tabs">
-      <button class="tab active" onclick="showTab('sign')">✍️ Sign</button>
-      <button class="tab" onclick="showTab('verify')">🔍 Verify</button>
+      <button class="tab active" onclick="showMainTab('sign')">✍️ Sign</button>
+      <button class="tab" onclick="showMainTab('verify')">🔍 Verify</button>
     </div>
 
-    <!-- Sign Panel -->
-    <div id="sign-panel" class="panel active">
-      
-      <!-- Transparency Disclosure - BRUTALLY HONEST -->
-      <div class="info-box warning">
-        <h4>⚠️ BRUTAL HONESTY - What This Does &amp; Doesn't Do</h4>
-        <p><strong>4 LAYERS OF PROTECTION:</strong></p>
-        <ul>
-          <li>🏷️ <strong>Billboard:</strong> EXIF/metadata visible in Windows Properties</li>
-          <li>🧬 <strong>DNA:</strong> LSB steganography in pixels (lossless only)</li>
-          <li>📡 <strong>The Spread:</strong> DCT watermark survives JPEG/screenshots</li>
-          <li>🔐 <strong>Forensic:</strong> Encrypted accountability (operator only)</li>
-        </ul>
-        <div class="expandable" onclick="toggleDetails(this)">▶ What survives what...</div>
-        <div class="details">
-          <p><strong style="color: #4ade80;">✅ SURVIVES:</strong></p>
-          <ul>
-            <li><strong>The Spread (DCT):</strong> JPEG compression, screenshots, cropping, social media upload, format conversion</li>
-            <li><strong>DNA (LSB):</strong> Lossless PNG operations, mild cropping</li>
-            <li><strong>Billboard (metadata):</strong> Basic file sharing (but easily stripped)</li>
-          </ul>
-          <p style="margin-top: 12px;"><strong style="color: #f87171;">❌ DOES NOT SURVIVE:</strong></p>
-          <ul>
-            <li>Heavy blur or noise addition</li>
-            <li>Extreme compression (&lt;50% JPEG quality)</li>
-            <li>Rotation or perspective changes</li>
-            <li>AI regeneration (img2img)</li>
-            <li>Print and re-scan</li>
-            <li>Intentional removal attacks</li>
-          </ul>
-          <p style="margin-top: 12px;"><strong style="color: #fcd34d;">⚠️ FORENSIC DATA CAPTURED:</strong></p>
-          <ul>
-            <li>Your IP address at signing time</li>
-            <li>Session fingerprint (8-byte hash)</li>
-            <li>Unix timestamp (exact second)</li>
-            <li>Platform/build ID</li>
-          </ul>
-          <p style="margin-top: 12px; color: rgba(255, 100, 100, 0.9); font-weight: 600;">
-            This data is encrypted and can ONLY be decrypted by the system operator 
-            (e.g., upon request from law enforcement). It survives screenshots and JPEG compression.
-          </p>
-        </div>
+    <!-- Sign Sub-Tabs (file type selector) -->
+    <div id="sign-subtabs" class="subtabs">
+      <button class="subtab active" onclick="showSignType('image')">🖼️ Image</button>
+      <button class="subtab" onclick="showSignType('video')">🎬 Video</button>
+      <button class="subtab" onclick="showSignType('audio')">🎵 Audio</button>
+      <button class="subtab" onclick="showSignType('document')">📄 Document</button>
+    </div>
+
+    <!-- ============ IMAGE SIGN PANEL ============ -->
+    <div id="sign-image-panel" class="panel active">
+      <div class="info-box">
+        <h4>🖼️ Image Signing</h4>
+        <p>Embeds provenance via LSB steganography + DCT watermark. Survives screenshots &amp; JPEG.</p>
       </div>
 
-      <div class="drop-zone" onclick="document.getElementById('sign-file').click()" 
+      <div class="drop-zone" onclick="document.getElementById('sign-image-file').click()" 
            ondragover="event.preventDefault(); this.classList.add('dragover')"
            ondragleave="this.classList.remove('dragover')"
-           ondrop="handleDrop(event, 'sign')">
-        <div class="icon">📤</div>
-        <p><strong>Drop file here</strong> or click to browse</p>
-        <p>PNG, JPG, WebP, GIF, TIFF, PDF • Max 50MB</p>
+           ondrop="handleDrop(event, 'sign-image')">
+        <div class="icon">🖼️</div>
+        <p><strong>Drop image here</strong></p>
+        <p>PNG, JPG, WebP, GIF, TIFF • Max 50MB</p>
       </div>
-      <input type="file" id="sign-file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/tiff,application/pdf" onchange="handleFileSelect(this, 'sign')">
+      <input type="file" id="sign-image-file" accept="image/png,image/jpeg,image/webp,image/gif,image/tiff" onchange="handleFileSelect(this, 'sign-image')">
 
       <div class="form-row">
         <div class="form-group">
           <label>Generation Method</label>
-          <select id="method" onchange="updateFormFields()">
+          <select id="image-method" onchange="updateImageFields()">
             <option value="ai">🤖 AI Generated</option>
             <option value="human">🎨 Human Created</option>
-            <option value="mixed">🔀 Mixed / AI-Assisted</option>
-            <option value="unknown">❓ Unknown</option>
+            <option value="mixed">🔀 AI-Assisted</option>
           </select>
         </div>
-        <div class="form-group" id="generator-group">
-          <label id="generator-label">Generator / Tool</label>
-          <input type="text" id="generator" placeholder="e.g., Midjourney, Photoshop">
+        <div class="form-group">
+          <label>Generator / Tool</label>
+          <input type="text" id="image-generator" placeholder="e.g., Midjourney, Photoshop">
         </div>
       </div>
 
-      <!-- AI/Mixed Fields -->
-      <div class="form-row" id="ai-fields">
+      <div class="form-row" id="image-ai-fields">
         <div class="form-group">
           <label>Model (optional)</label>
-          <input type="text" id="model" placeholder="e.g., FLUX.1, SDXL">
+          <input type="text" id="image-model" placeholder="e.g., FLUX.1, SDXL">
         </div>
         <div class="form-group">
           <label>Prompt (optional)</label>
-          <input type="text" id="prompt" placeholder="Generation prompt">
+          <input type="text" id="image-prompt" placeholder="Generation prompt">
         </div>
       </div>
 
-      <!-- Human/Mixed Creator Fields -->
-      <div class="form-row hidden" id="human-fields">
+      <button class="primary" id="sign-image-btn" onclick="signContent('image')" disabled>Sign Image</button>
+      <div id="sign-image-result" class="result"></div>
+    </div>
+
+    <!-- ============ VIDEO SIGN PANEL ============ -->
+    <div id="sign-video-panel" class="panel">
+      <div class="info-box">
+        <h4>🎬 Video Signing</h4>
+        <p>Creates sidecar JSON with content hash. Video file unchanged (lossless approach).</p>
+      </div>
+
+      <div class="drop-zone" onclick="document.getElementById('sign-video-file').click()" 
+           ondragover="event.preventDefault(); this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="handleDrop(event, 'sign-video')">
+        <div class="icon">🎬</div>
+        <p><strong>Drop video here</strong></p>
+        <p>MP4, WebM, MOV • Max 500MB</p>
+      </div>
+      <input type="file" id="sign-video-file" accept="video/mp4,video/webm,video/quicktime" onchange="handleFileSelect(this, 'sign-video')">
+
+      <div class="form-row">
         <div class="form-group">
-          <label>Creator Name (optional)</label>
-          <input type="text" id="creator-name" placeholder="Your name or handle">
+          <label>Generation Method</label>
+          <select id="video-method">
+            <option value="ai">🤖 AI Generated</option>
+            <option value="human">🎨 Human Created</option>
+            <option value="mixed">🔀 AI-Assisted</option>
+          </select>
         </div>
         <div class="form-group">
-          <label>Contact Email (optional)</label>
-          <input type="email" id="creator-email" placeholder="your@email.com">
+          <label>Generator / Tool</label>
+          <input type="text" id="video-generator" placeholder="e.g., Sora, Runway, Premiere">
         </div>
       </div>
 
-      <button class="primary" id="sign-btn" onclick="signFile()" disabled>Sign File</button>
+      <button class="primary" id="sign-video-btn" onclick="signContent('video')" disabled>Sign Video</button>
+      <div id="sign-video-result" class="result"></div>
+    </div>
 
-      <div id="sign-result" class="result"></div>
+    <!-- ============ AUDIO SIGN PANEL ============ -->
+    <div id="sign-audio-panel" class="panel">
+      <div class="info-box">
+        <h4>🎵 Audio Signing</h4>
+        <p>Embeds metadata in WAV header or creates sidecar for compressed formats.</p>
+      </div>
+
+      <div class="drop-zone" onclick="document.getElementById('sign-audio-file').click()" 
+           ondragover="event.preventDefault(); this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="handleDrop(event, 'sign-audio')">
+        <div class="icon">🎵</div>
+        <p><strong>Drop audio here</strong></p>
+        <p>WAV, MP3, FLAC, OGG • Max 100MB</p>
+      </div>
+      <input type="file" id="sign-audio-file" accept="audio/wav,audio/mpeg,audio/flac,audio/ogg" onchange="handleFileSelect(this, 'sign-audio')">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Generation Method</label>
+          <select id="audio-method">
+            <option value="ai">🤖 AI Generated (TTS/Music)</option>
+            <option value="human">🎨 Human Recording</option>
+            <option value="mixed">🔀 AI-Assisted</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Generator / Tool</label>
+          <input type="text" id="audio-generator" placeholder="e.g., ElevenLabs, Audacity">
+        </div>
+      </div>
+
+      <button class="primary" id="sign-audio-btn" onclick="signContent('audio')" disabled>Sign Audio</button>
+      <div id="sign-audio-result" class="result"></div>
+    </div>
+
+    <!-- ============ DOCUMENT SIGN PANEL ============ -->
+    <div id="sign-document-panel" class="panel">
+      <div class="info-box">
+        <h4>📄 Document Signing</h4>
+        <p>Embeds metadata in PDF properties. Creates sidecar for verification.</p>
+      </div>
+
+      <div class="drop-zone" onclick="document.getElementById('sign-document-file').click()" 
+           ondragover="event.preventDefault(); this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="handleDrop(event, 'sign-document')">
+        <div class="icon">📄</div>
+        <p><strong>Drop PDF here</strong></p>
+        <p>PDF only • Max 50MB</p>
+      </div>
+      <input type="file" id="sign-document-file" accept="application/pdf" onchange="handleFileSelect(this, 'sign-document')">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Generation Method</label>
+          <select id="document-method">
+            <option value="ai">🤖 AI Generated</option>
+            <option value="human">🎨 Human Created</option>
+            <option value="mixed">🔀 AI-Assisted</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Generator / Tool</label>
+          <input type="text" id="document-generator" placeholder="e.g., ChatGPT, Word">
+        </div>
+      </div>
+
+      <button class="primary" id="sign-document-btn" onclick="signContent('document')" disabled>Sign Document</button>
+      <div id="sign-document-result" class="result"></div>
     </div>
 
     <!-- Verify Panel -->
     <div id="verify-panel" class="panel">
+      <div class="info-box">
+        <h4>🔍 Verify Any File</h4>
+        <p>Check if a file has elaraSign provenance embedded.</p>
+      </div>
+
       <div class="drop-zone" onclick="document.getElementById('verify-file').click()"
            ondragover="event.preventDefault(); this.classList.add('dragover')"
            ondragleave="this.classList.remove('dragover')"
            ondrop="handleDrop(event, 'verify')">
         <div class="icon">🔍</div>
-        <p><strong>Drop file here</strong> or click to browse</p>
-        <p>Check if file has elaraSign provenance</p>
+        <p><strong>Drop any file here</strong></p>
+        <p>Images, Videos, Audio, PDFs</p>
       </div>
-      <input type="file" id="verify-file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/tiff,application/pdf" onchange="handleFileSelect(this, 'verify')">
+      <input type="file" id="verify-file" accept="image/*,video/*,audio/*,application/pdf" onchange="handleFileSelect(this, 'verify')">
 
       <button class="primary" id="verify-btn" onclick="verifyFile()" disabled>Verify File</button>
-
       <div id="verify-result" class="result"></div>
     </div>
 
@@ -917,172 +1019,86 @@
   </div>
 
   <script>
-    let signFileData = null;
-    let verifyFileData = null;
+    // File data storage by type
+    const fileData = { image: null, video: null, audio: null, document: null, verify: null };
+    let currentSignType = 'image';
 
-    const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/tiff', 'application/pdf'];
-
-    // Toggle details in info boxes
-    function toggleDetails(el) {
-      const details = el.nextElementSibling;
-      details.classList.toggle('show');
-      el.textContent = details.classList.contains('show') ? '▼ Hide details' : '▶ More details...';
-    }
-
-    // Fetch and display build ID
-    async function fetchBuildId() {
-      try {
-        const res = await fetch('/api/build-info');
-        const data = await res.json();
-        document.getElementById('build-id').textContent = data.shortId || 'DEV';
-        
-        // Also check forensic status
-        const statusRes = await fetch('/api');
-        const statusData = await statusRes.json();
-        
-        const forensicIndicator = document.getElementById('forensic-status');
-        if (forensicIndicator) {
-          if (statusData.forensic?.enabled) {
-            forensicIndicator.innerHTML = '🔒 Forensic accountability <strong>ENABLED</strong>';
-            forensicIndicator.classList.add('enabled');
-          } else {
-            forensicIndicator.innerHTML = '🔓 Forensic accountability disabled (development mode)';
-            forensicIndicator.classList.remove('enabled');
-          }
-        }
-      } catch {
-        document.getElementById('build-id').textContent = 'DEV';
+    // Show main tab (Sign vs Verify)
+    function showMainTab(tab) {
+      document.querySelectorAll('.tabs .tab').forEach(t => { t.classList.remove('active'); });
+      event.target.classList.add('active');
+      
+      const subtabs = document.getElementById('sign-subtabs');
+      const verifyPanel = document.getElementById('verify-panel');
+      
+      if (tab === 'sign') {
+        subtabs.classList.remove('hidden');
+        verifyPanel.classList.remove('active');
+        showSignType(currentSignType);
+      } else {
+        subtabs.classList.add('hidden');
+        document.querySelectorAll('.panel').forEach(p => { p.classList.remove('active'); });
+        verifyPanel.classList.add('active');
       }
     }
 
-    // Dynamic form field management based on generation method
-    function updateFormFields() {
-      const method = document.getElementById('method').value;
-      const aiFields = document.getElementById('ai-fields');
-      const humanFields = document.getElementById('human-fields');
-      const generatorLabel = document.getElementById('generator-label');
-      const generatorInput = document.getElementById('generator');
-
-      // Reset visibility
-      aiFields.classList.remove('hidden');
-      humanFields.classList.remove('hidden');
-
-      switch (method) {
-        case 'ai':
-          // AI: Show Generator/Tool + Model/Prompt, hide Human fields
-          generatorLabel.textContent = 'Generator / Tool';
-          generatorInput.placeholder = 'e.g., Midjourney, DALL-E, Stable Diffusion';
-          aiFields.classList.remove('hidden');
-          humanFields.classList.add('hidden');
-          break;
-        case 'human':
-          // Human: Show Generator (as Tool) + Name/Email, hide AI fields
-          generatorLabel.textContent = 'Tool Used';
-          generatorInput.placeholder = 'e.g., Photoshop, Procreate, Camera';
-          aiFields.classList.add('hidden');
-          humanFields.classList.remove('hidden');
-          break;
-        case 'mixed':
-          // Mixed: Show ALL fields
-          generatorLabel.textContent = 'AI Tool / Generator';
-          generatorInput.placeholder = 'e.g., Midjourney + Photoshop';
-          aiFields.classList.remove('hidden');
-          humanFields.classList.remove('hidden');
-          break;
-        case 'unknown':
-          // Unknown: Just basic fields
-          generatorLabel.textContent = 'Source (if known)';
-          generatorInput.placeholder = 'Where did this come from?';
-          aiFields.classList.add('hidden');
-          humanFields.classList.add('hidden');
-          break;
+    // Show sign sub-panel by type
+    function showSignType(type) {
+      currentSignType = type;
+      document.querySelectorAll('.subtab').forEach(t => { t.classList.remove('active'); });
+      if (event?.target) {
+        event.target.classList.add('active');
+      } else {
+        document.querySelector(`.subtab:nth-child(${['image','video','audio','document'].indexOf(type)+1})`).classList.add('active');
       }
-    }
-
-    // Initialize form fields on load
-    document.addEventListener('DOMContentLoaded', () => {
-      updateFormFields();
-      fetchBuildId();
-    });
-
-    // Download ZIP bundle with one click
-    function downloadBundle(bundleUrl) {
-      const a = document.createElement('a');
-      a.href = bundleUrl;
-      a.download = '';
-      a.click();
-    }
-
-    function showTab(tab) {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-      document.querySelector(`.tab:nth-child(${tab === 'sign' ? 1 : 2})`).classList.add('active');
-      document.getElementById(`${tab}-panel`).classList.add('active');
-    }
-
-    function isValidType(file) {
-      return ALLOWED_TYPES.includes(file.type) || file.name.toLowerCase().endsWith('.pdf');
+      
+      document.querySelectorAll('.panel').forEach(p => { p.classList.remove('active'); });
+      document.getElementById(`sign-${type}-panel`).classList.add('active');
     }
 
     function handleDrop(e, type) {
       e.preventDefault();
       e.currentTarget.classList.remove('dragover');
       const file = e.dataTransfer.files[0];
-
-      if (file && isValidType(file)) {
-        if (type === 'sign') {
-          signFileData = file;
-          document.getElementById('sign-btn').disabled = false;
-        } else {
-          verifyFileData = file;
-          document.getElementById('verify-btn').disabled = false;
-        }
-        const icon = file.type === 'application/pdf' ? '📄' : '🖼️';
-        e.currentTarget.innerHTML = `<div class="icon">${icon}</div><p><strong>${file.name}</strong></p><p>${(file.size / 1024).toFixed(1)} KB</p>`;
-      } else {
-        e.currentTarget.innerHTML = `<div class="icon">❌</div><p><strong>Unsupported format</strong></p><p>Use PNG, JPG, WebP, GIF, TIFF, or PDF</p>`;
+      if (file) {
+        const key = type.replace('sign-', '');
+        fileData[key] = file;
+        document.getElementById(`${type}-btn`).disabled = false;
+        const icons = {image:'🖼️', video:'🎬', audio:'🎵', document:'📄', verify:'🔍'};
+        e.currentTarget.innerHTML = `<div class="icon">${icons[key]||'📤'}</div><p><strong>${file.name}</strong></p><p>${(file.size/1024).toFixed(1)} KB</p>`;
       }
     }
 
     function handleFileSelect(input, type) {
       const file = input.files[0];
       if (file) {
-        if (type === 'sign') {
-          signFileData = file;
-          document.getElementById('sign-btn').disabled = false;
-        } else {
-          verifyFileData = file;
-          document.getElementById('verify-btn').disabled = false;
-        }
-        const icon = file.type === 'application/pdf' ? '📄' : '🖼️';
-        input.previousElementSibling.innerHTML = `<div class="icon">${icon}</div><p><strong>${file.name}</strong></p><p>${(file.size / 1024).toFixed(1)} KB</p>`;
+        const key = type.replace('sign-', '');
+        fileData[key] = file;
+        document.getElementById(`${type}-btn`).disabled = false;
+        const icons = {image:'🖼️', video:'🎬', audio:'🎵', document:'📄', verify:'🔍'};
+        input.previousElementSibling.innerHTML = `<div class="icon">${icons[key]||'📤'}</div><p><strong>${file.name}</strong></p><p>${(file.size/1024).toFixed(1)} KB</p>`;
       }
     }
 
-    async function signFile() {
-      if (!signFileData) return;
+    async function signContent(type) {
+      const file = fileData[type];
+      if (!file) {
+        return;
+      }
 
-      const btn = document.getElementById('sign-btn');
-      const result = document.getElementById('sign-result');
+      const btn = document.getElementById(`sign-${type}-btn`);
+      const result = document.getElementById(`sign-${type}-result`);
       btn.disabled = true;
       btn.textContent = 'Signing...';
 
-      const method = document.getElementById('method').value;
       const formData = new FormData();
-      formData.append('file', signFileData);
-      formData.append('generator', document.getElementById('generator').value || 'elaraSign.web');
-      formData.append('method', method);
+      formData.append('file', file);
+      formData.append('generator', document.getElementById(`${type}-generator`).value || 'elaraSign.web');
+      formData.append('method', document.getElementById(`${type}-method`).value);
       
-      // AI/Mixed fields
-      if (method === 'ai' || method === 'mixed') {
-        formData.append('model', document.getElementById('model').value);
-        formData.append('prompt', document.getElementById('prompt').value);
-      }
-      
-      // Human/Mixed fields - include creator info
-      if (method === 'human' || method === 'mixed') {
-        formData.append('creatorName', document.getElementById('creator-name').value);
-        formData.append('creatorEmail', document.getElementById('creator-email').value);
+      if (type === 'image') {
+        formData.append('model', document.getElementById('image-model')?.value || '');
+        formData.append('prompt', document.getElementById('image-prompt')?.value || '');
       }
 
       try {
@@ -1090,24 +1106,15 @@
         const data = await res.json();
 
         if (data.success) {
-          const isPdf = signFileData.type === 'application/pdf';
-          const fileType = isPdf ? 'PDF' : 'Image';
-          const methodLabel = {ai: '🤖 AI', human: '🎨 Human', mixed: '🔀 Mixed', unknown: '❓ Unknown'}[document.getElementById('method').value];
-          
           result.className = 'result show success';
           result.innerHTML = `
-            <h3>✅ ${fileType} Signed Successfully</h3>
-            <p><strong>Generation Method:</strong> ${methodLabel}</p>
-            <p><strong>Meta Hash:</strong> ${data.signature.metaHash}</p>
-            <p><strong>Locations:</strong> ${data.signature.locations.join(', ')}</p>
-            <p><strong>Version:</strong> ${data.signature.version}</p>
-            <button class="download-btn" onclick="downloadBundle('${data.downloadUrl}')">⬇️ Download Signed ${fileType}</button>
-            <p class="download-note">Downloads ZIP bundle (image + sidecar + README)</p>
-            <pre>${JSON.stringify(data, null, 2)}</pre>
+            <h3>✅ ${type.charAt(0).toUpperCase() + type.slice(1)} Signed</h3>
+            <p><strong>Hash:</strong> ${data.signature?.metaHash || 'N/A'}</p>
+            <button class="download-btn" onclick="location.href='${data.downloadUrl}'">⬇️ Download</button>
           `;
         } else {
           result.className = 'result show error';
-          result.innerHTML = `<h3>❌ Signing Failed</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+          result.innerHTML = `<h3>❌ Failed</h3><p>${data.error || 'Unknown error'}</p>`;
         }
       } catch (err) {
         result.className = 'result show error';
@@ -1115,15 +1122,32 @@
       }
 
       btn.disabled = false;
-      btn.textContent = 'Sign File';
+      btn.textContent = `Sign ${type.charAt(0).toUpperCase() + type.slice(1)}`;
     }
 
-    // Store last verified file for forensic unlock
-    let lastVerifiedFile = null;
-    let lastMetaHash = null;
+    function updateImageFields() {
+      const method = document.getElementById('image-method').value;
+      const aiFields = document.getElementById('image-ai-fields');
+      aiFields.style.display = (method === 'ai' || method === 'mixed') ? 'grid' : 'none';
+    }
+
+    async function fetchBuildId() {
+      try {
+        const res = await fetch('/api/build-info');
+        const data = await res.json();
+        document.getElementById('build-id').textContent = data.shortId || 'DEV';
+      } catch {
+        document.getElementById('build-id').textContent = 'DEV';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', fetchBuildId);
 
     async function verifyFile() {
-      if (!verifyFileData) return;
+      const file = fileData.verify;
+      if (!file) {
+        return;
+      }
 
       const btn = document.getElementById('verify-btn');
       const result = document.getElementById('verify-result');
@@ -1131,69 +1155,27 @@
       btn.textContent = 'Verifying...';
 
       const formData = new FormData();
-      formData.append('file', verifyFileData);
+      formData.append('file', file);
 
       try {
         const res = await fetch('/api/verify', { method: 'POST', body: formData });
         const data = await res.json();
 
         if (data.signed) {
-          // Store for forensic unlock
-          lastVerifiedFile = verifyFileData;
-          lastMetaHash = data.signature?.metaHash;
-          
-          const statusClass = data.tampered ? 'warning' : 'success';
           const badge = data.tampered
             ? '<span class="status-badge tampered">⚠️ TAMPERED</span>'
             : '<span class="status-badge signed">✅ VERIFIED</span>';
           
-          // Build layer status display
-          const layers = data.layers || {};
-          const layerStatus = `
-            <div class="layer-status">
-              <span class="layer ${layers.lsb ? 'found' : 'missing'}">🧬 DNA (LSB): ${layers.lsb ? '✓' : '✗'}</span>
-              <span class="layer ${layers.spreadSpectrum ? 'found' : 'missing'}">📡 Spread: ${layers.spreadSpectrum ? '✓ ' + (layers.spreadConfidence || 0) + '%' : '✗'}</span>
-            </div>
-          `;
-
-          result.className = `result show ${statusClass}`;
+          result.className = `result show ${data.tampered ? 'warning' : 'success'}`;
           result.innerHTML = `
-            <h3>${badge} elaraSign Provenance Found</h3>
-            ${layerStatus}
-            <p><strong>Version:</strong> ${data.signature.version}</p>
-            <p><strong>Timestamp:</strong> ${data.signature.timestamp || 'N/A'}</p>
-            <p><strong>Meta Hash:</strong> <code style="font-size: 0.8em;">${data.signature.metaHash}</code></p>
-            <p><strong>Valid Locations:</strong> ${data.signature.validLocations?.join(', ') || 'N/A'}</p>
-            <p>${data.message}</p>
-            
-            <!-- Forensic Unlock Section -->
-            <div class="forensic-section">
-              <div class="forensic-header" onclick="toggleForensic()">
-                <span>🔐 Forensic Data (Operator Only)</span>
-                <span id="forensic-toggle">▶</span>
-              </div>
-              <div id="forensic-content" class="forensic-content hidden">
-                <p class="forensic-note">Enter the master key to reveal accountability data embedded in this image.</p>
-                <div class="forensic-input-group">
-                  <input type="password" id="forensic-key" placeholder="Enter master key (64 hex characters)" maxlength="64">
-                  <button class="forensic-btn" onclick="unlockForensic()">🔓 Unlock</button>
-                </div>
-                <div id="forensic-result"></div>
-              </div>
-            </div>
-            
-            <pre>${JSON.stringify(data, null, 2)}</pre>
+            <h3>${badge} elaraSign Found</h3>
+            <p><strong>Version:</strong> ${data.signature?.version || 'N/A'}</p>
+            <p><strong>Timestamp:</strong> ${data.signature?.timestamp || 'N/A'}</p>
+            <p><strong>Hash:</strong> <code>${data.signature?.metaHash || 'N/A'}</code></p>
           `;
         } else {
-          lastVerifiedFile = null;
           result.className = 'result show error';
-          result.innerHTML = `
-            <h3><span class="status-badge unsigned">❌ NOT SIGNED</span></h3>
-            <p>${data.message}</p>
-            <p style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 16px;">
-              This file has no elaraSign provenance. It could be from any source.
-            </p>
-          `;
+          result.innerHTML = `<h3><span class="status-badge unsigned">❌ NOT SIGNED</span></h3><p>${data.message}</p>`;
         }
       } catch (err) {
         result.className = 'result show error';
@@ -1203,59 +1185,16 @@
       btn.disabled = false;
       btn.textContent = 'Verify File';
     }
-    
-    function toggleForensic() {
-      const content = document.getElementById('forensic-content');
-      const toggle = document.getElementById('forensic-toggle');
-      content.classList.toggle('hidden');
-      toggle.textContent = content.classList.contains('hidden') ? '▶' : '▼';
-    }
-    
-    async function unlockForensic() {
-      if (!lastVerifiedFile) {
-        alert('No verified file available');
-        return;
-      }
-      
-      const keyInput = document.getElementById('forensic-key');
-      const resultDiv = document.getElementById('forensic-result');
-      const key = keyInput.value.trim();
-      
-      if (!key || key.length !== 64) {
-        resultDiv.innerHTML = '<p class="forensic-error">⚠️ Key must be exactly 64 hexadecimal characters</p>';
-        return;
-      }
-      
-      resultDiv.innerHTML = '<p class="forensic-loading">🔄 Decrypting...</p>';
-      
-      const formData = new FormData();
-      formData.append('file', lastVerifiedFile);
-      formData.append('key', key);
-      
-      try {
-        const res = await fetch('/api/forensic-unlock', { method: 'POST', body: formData });
-        const data = await res.json();
-        
-        if (data.success) {
-          resultDiv.innerHTML = `
-            <div class="forensic-success">
-              <h4>🔓 Forensic Data Decrypted</h4>
-              <div class="forensic-data">
-                <p><strong>📅 Signed At:</strong> ${new Date(data.forensicData.timestamp).toLocaleString()}</p>
-                <p><strong>🖥️ Platform:</strong> ${data.forensicData.platform}</p>
-                <p><strong>🌐 IP Address:</strong> ${data.forensicData.ip}</p>
-                <p><strong>🔑 User Fingerprint:</strong> <code>${data.forensicData.userFingerprint}</code></p>
-              </div>
-              <p class="forensic-note">This data was encrypted at signing time and is only accessible with the master key.</p>
-            </div>
-          `;
-        } else {
-          resultDiv.innerHTML = `<p class="forensic-error">❌ ${data.error || 'Decryption failed'}</p>`;
-        }
-      } catch (err) {
-        resultDiv.innerHTML = `<p class="forensic-error">❌ Error: ${err.message}</p>`;
-      }
-    }
+
+    // Expose functions to global scope for onclick handlers
+    // This makes Biome understand these ARE used (via HTML onclick attributes)
+    window.showMainTab = showMainTab;
+    window.showSignType = showSignType;
+    window.handleDrop = handleDrop;
+    window.handleFileSelect = handleFileSelect;
+    window.signContent = signContent;
+    window.updateImageFields = updateImageFields;
+    window.verifyFile = verifyFile;
   </script>
 </body>
 </html>

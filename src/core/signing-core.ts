@@ -734,7 +734,7 @@ export async function verifyImageContent(
 	// Extract from all locations
 	const extracted = extractMultiLocationSignature(imageData, width, height);
 
-	if (extracted.validLocations.length === 0) {
+	if (extracted.validLocations.length === 0 || !extracted.bestSignature) {
 		return {
 			isValid: false,
 			tamperDetected: false,
@@ -744,7 +744,7 @@ export async function verifyImageContent(
 		};
 	}
 
-	const best = extracted.bestSignature!;
+	const best = extracted.bestSignature;
 
 	// If metadata provided, verify hashes match
 	if (metadata) {

@@ -27,6 +27,10 @@ npm-debug.log*
 # Preflight marker (local state)
 .preflight-passed
 
+# Deployment state (local tracking)
+.preview-revision
+.last-live-revision
+
 # Test output
 coverage/
 test-output/
