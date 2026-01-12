@@ -81,13 +81,42 @@ if ($projectId -eq $gcloudProject) {
 }
 
 # Check 5: Node.js
-Write-Host "[5/5] Checking Node.js..." -ForegroundColor Yellow
+Write-Host "[5/7] Checking Node.js..." -ForegroundColor Yellow
 $nodeVersion = & node --version 2>&1
 if ($nodeVersion -match "^v\d+") {
     Write-Host "      OK - Node.js $nodeVersion" -ForegroundColor Green
 } else {
     Write-Host "      FAIL - Node.js not found" -ForegroundColor Red
     $allGood = $false
+}
+
+# Check 6: npm install (ensure dependencies exist)
+Write-Host "[6/7] Checking dependencies..." -ForegroundColor Yellow
+if (-not (Test-Path (Join-Path $PSScriptRoot "node_modules"))) {
+    Write-Host "      Installing dependencies..." -ForegroundColor Yellow
+    $npmInstall = & npm install 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "      FAIL - npm install failed" -ForegroundColor Red
+        $allGood = $false
+    } else {
+        Write-Host "      OK - Dependencies installed" -ForegroundColor Green
+    }
+} else {
+    Write-Host "      OK - node_modules exists" -ForegroundColor Green
+}
+
+# Check 7: TypeScript compiles (THE TRUTHFULNESS CHECK)
+# This is CRITICAL - preflight must not pass if code doesn't build
+Write-Host "[7/7] Verifying TypeScript compiles..." -ForegroundColor Yellow
+$buildOutput = & npm run build 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "      FAIL - TypeScript build failed:" -ForegroundColor Red
+    $buildOutput | Where-Object { $_ -match "error TS" } | ForEach-Object {
+        Write-Host "            $_" -ForegroundColor Red
+    }
+    $allGood = $false
+} else {
+    Write-Host "      OK - TypeScript compiles successfully" -ForegroundColor Green
 }
 
 Write-Host ""
