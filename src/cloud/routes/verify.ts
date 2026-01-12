@@ -18,6 +18,11 @@ import sharp from "sharp";
 import { decryptAccountability, isValidMasterKey } from "../../core/forensic-crypto.js";
 import { hasElaraSignature, readSignature, verifyImageContent } from "../../core/signing-core.js";
 import { extractSpreadSpectrum } from "../../core/spread-spectrum.js";
+import { 
+	type BillboardMetadata,
+	extractJpegElaraMetadata, 
+	extractPngElaraMetadata 
+} from "../../core/standard-metadata.js";
 import { extractForensicPayload, verifyPdfSignature } from "./sign.js";
 
 const router = Router();
@@ -85,26 +90,72 @@ router.post("/verify", upload.single("file"), async (req, res) => {
 		// Handle images via sharp
 		const image = sharp(buffer);
 		const imageMetadata = await image.metadata();
-		const { width, height } = imageMetadata;
+		const { width, height, format } = imageMetadata;
 
 		if (!width || !height) {
 			return res.status(400).json({ error: "Could not read image dimensions" });
 		}
 
-		// Get raw RGBA pixel data
+		// =====================================================================
+		// LAYER 1: Billboard (EXIF/PNG tEXt) - Human-readable metadata
+		// =====================================================================
+		let billboard: BillboardMetadata | null = null;
+
+		if (mimetype === "image/jpeg" || format === "jpeg") {
+			billboard = extractJpegElaraMetadata(buffer);
+		} else if (mimetype === "image/png" || format === "png") {
+			// Sharp returns PNG text chunks in metadata
+			billboard = extractPngElaraMetadata(imageMetadata as { 
+				comments?: Array<{ keyword: string; text: string }> 
+			});
+		}
+
+		// Get raw RGBA pixel data for steganographic analysis
 		const rawBuffer = await image.ensureAlpha().raw().toBuffer();
 
 		const imageData = new Uint8ClampedArray(rawBuffer);
 
-		// Quick check for LSB signature
+		// =====================================================================
+		// LAYER 2: DNA (LSB Steganography) - Hidden signature
+		// =====================================================================
 		const hasSig = hasElaraSignature(imageData, width, height);
 
 		if (!hasSig) {
-			// No LSB signature found - but check for spread spectrum watermark
-			// This allows us to still identify images that were screenshotted/compressed
-			// Note: We need the metaHash to extract, which we don't have without the LSB sig
-			// So we return a hint about what might have happened
+			// No LSB signature found - but we might have billboard metadata!
+			// This is important: image could have been re-encoded (JPEG) but still have EXIF
 
+			if (billboard?.found) {
+				// Billboard found but DNA missing - image was likely re-encoded
+				return res.json({
+					type: "image",
+					format: mimetype,
+					signed: true,
+					verified: false,
+					message: "elaraSign metadata found but hidden signature missing",
+					note: "Image appears to have been re-encoded or processed, which removed the steganographic layer. The visible metadata layer remains.",
+					billboard: {
+						found: true,
+						source: billboard.source,
+						software: billboard.software,
+						copyright: billboard.copyright,
+						description: billboard.description,
+						creator: billboard.creator,
+						timestamp: billboard.timestamp,
+						metaHash: billboard.metaHash,
+						generationMethod: billboard.generationMethod,
+						generator: billboard.generator,
+						model: billboard.model,
+					},
+					layers: {
+						billboard: true,
+						lsb: false,
+						spreadSpectrum: false,
+					},
+					hint: "The visible metadata can be easily stripped. For authoritative verification, use the original PNG file.",
+				});
+			}
+
+			// Neither billboard nor DNA found
 			return res.json({
 				type: "image",
 				format: mimetype,
@@ -112,19 +163,29 @@ router.post("/verify", upload.single("file"), async (req, res) => {
 				message: "No elaraSign signature detected",
 				note:
 					mimetype === "image/jpeg"
-						? "JPEG compression may have degraded the LSB signature. If forensic accountability was enabled, spread spectrum watermark may still be recoverable with the metaHash."
-						: "If this image was screenshotted or re-encoded, the LSB signature may be lost. Spread spectrum watermark may still be present.",
+						? "JPEG compression removes the hidden signature. If this was originally signed, try the original PNG."
+						: "If this image was screenshotted or re-encoded, the signature may be lost.",
+				billboard: { found: false },
+				layers: {
+					billboard: false,
+					lsb: false,
+					spreadSpectrum: false,
+				},
 				hint: "Operator can attempt forensic recovery if metaHash is known from another source.",
 			});
 		}
 
-		// Read signature details
+		// =====================================================================
+		// LAYER 2 SUCCESS: Read full signature details
+		// =====================================================================
 		const sigInfo = readSignature(imageData, width, height);
 
-		// Verify integrity
+		// Verify integrity (content hash check)
 		const verification = await verifyImageContent(imageData, width, height);
 
-		// Try to extract spread spectrum watermark using metaHash as seed
+		// =====================================================================
+		// LAYER 3: The Spread (DCT Watermark) - Survives JPEG/screenshots
+		// =====================================================================
 		let spreadSpectrumFound = false;
 		let spreadConfidence = 0;
 
@@ -152,9 +213,23 @@ router.post("/verify", upload.single("file"), async (req, res) => {
 				metaHash: sigInfo.metaHash,
 				validLocations: sigInfo.validLocations,
 			},
+			// Billboard layer - human-readable metadata (EXIF/PNG tEXt)
+			billboard: billboard?.found ? {
+				found: true,
+				source: billboard.source,
+				software: billboard.software,
+				copyright: billboard.copyright,
+				description: billboard.description,
+				creator: billboard.creator,
+				timestamp: billboard.timestamp,
+				generationMethod: billboard.generationMethod,
+				generator: billboard.generator,
+				model: billboard.model,
+			} : { found: false },
 			dimensions: { width, height },
-			// Watermark layer status
+			// All signature layers status
 			layers: {
+				billboard: billboard?.found || false,
 				lsb: true, // We got here, so LSB was found
 				spreadSpectrum: spreadSpectrumFound,
 				spreadConfidence: spreadSpectrumFound ? Math.round(spreadConfidence * 100) : undefined,
