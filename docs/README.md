@@ -2,16 +2,14 @@
 
 ## Contents
 
-- [API Reference](./API.md) - REST API documentation
-- [CLI Reference](./CLI.md) - Command-line tool usage
-- [Technical Spec](./TECHNICAL.md) - Signing format details
-- [Development](./DEVELOPMENT.md) - Contributing guide
+- [Testing Guide](./TESTING.md) - How to run tests with real API keys
+- [Deployment Guide](./DEPLOYMENT_GUIDE.md) - Cloud Run deployment
+- [Watermark Architecture](./WATERMARK_ARCHITECTURE.md) - 4-layer signing system
 
 ## Quick Links
 
 | Doc | Description |
 |-----|-------------|
-| [API.md](./API.md) | REST endpoints, request/response formats |
-| [CLI.md](./CLI.md) | Local command-line usage |
-| [TECHNICAL.md](./TECHNICAL.md) | v2.0 signing format, byte layout |
-| [DEVELOPMENT.md](./DEVELOPMENT.md) | Setup, testing, deployment |
+| [TESTING.md](./TESTING.md) | Run tests, diagnose failures, helper commands |
+| [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Deploy to Google Cloud Run |
+| [WATERMARK_ARCHITECTURE.md](./WATERMARK_ARCHITECTURE.md) | Technical details of signing layers |

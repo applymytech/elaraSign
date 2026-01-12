@@ -3,16 +3,16 @@
  *
  * Downloads signed file + sidecar as a ZIP bundle.
  * Ensures provenance data always travels with the content.
- * 
+ *
  * Bundle contents:
  * - image-signed.png (or .jpg, etc.) - The signed image with steganographic watermark
  * - image-sidecar.json - Human/machine readable provenance data
  * - README.txt - Instructions for verification
  */
 
-import { Router } from 'express';
-import archiver from 'archiver';
-import { getSession, markDownloaded, deleteSession } from '../storage/session-manager.js';
+import archiver from "archiver";
+import { Router } from "express";
+import { deleteSession, getSession, markDownloaded } from "../storage/session-manager.js";
 
 const router = Router();
 
@@ -20,7 +20,7 @@ const router = Router();
  * Generate README content for the bundle
  */
 function generateReadme(filename: string, sidecarName: string, metaHash: string): string {
-  return `elaraSign Content Provenance Bundle
+	return `elaraSign Content Provenance Bundle
 =====================================
 
 This bundle contains a signed file with embedded provenance metadata.
@@ -54,106 +54,140 @@ Learn more: https://sign.openelara.org
 `;
 }
 
-router.get('/download/:sessionId', async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-    const format = req.query.format as string; // 'zip' (default), 'image', 'sidecar'
-    const session = await getSession(sessionId);
+router.get("/download/:sessionId", async (req, res) => {
+	try {
+		const { sessionId } = req.params;
+		const format = req.query.format as string; // 'zip' (default), 'image', 'sidecar'
+		const session = await getSession(sessionId);
 
-    if (!session) {
-      return res.status(404).json({ error: 'Session not found or expired' });
-    }
+		if (!session) {
+			return res.status(404).json({ error: "Session not found or expired" });
+		}
 
-    // Mark as downloaded (triggers cleanup)
-    await markDownloaded(sessionId);
+		// Mark as downloaded (triggers cleanup)
+		await markDownloaded(sessionId);
 
-    // Determine content type and extension
-    const mimeType = session.mimeType || 'image/png';
-    const ext = mimeType === 'application/pdf' ? 'pdf' 
-      : mimeType === 'image/jpeg' ? 'jpg'
-      : mimeType === 'image/webp' ? 'webp'
-      : mimeType === 'image/tiff' ? 'tiff'
-      : 'png';
-    
-    const baseName = session.originalName.replace(/\.[^.]+$/, '');
-    const imageFilename = `${baseName}-signed.${ext}`;
-    const sidecarFilename = `${baseName}-sidecar.json`;
-    const bundleFilename = `${baseName}-elarasign-bundle.zip`;
+		// Determine content type and extension
+		const mimeType = session.mimeType || "image/png";
+		const ext =
+			mimeType === "application/pdf"
+				? "pdf"
+				: mimeType === "image/jpeg"
+					? "jpg"
+					: mimeType === "image/webp"
+						? "webp"
+						: mimeType === "image/tiff"
+							? "tiff"
+							: // Audio formats
+								mimeType === "audio/mpeg"
+								? "mp3"
+								: mimeType === "audio/wav" || mimeType === "audio/x-wav" || mimeType === "audio/wave"
+									? "wav"
+									: mimeType === "audio/flac"
+										? "flac"
+										: mimeType === "audio/ogg"
+											? "ogg"
+											: mimeType === "audio/mp4" || mimeType === "audio/x-m4a"
+												? "m4a"
+												: // Video formats
+													mimeType === "video/mp4"
+													? "mp4"
+													: mimeType === "video/webm"
+														? "webm"
+														: mimeType === "video/x-matroska"
+															? "mkv"
+															: mimeType === "video/quicktime"
+																? "mov"
+																: "png";
 
-    // Individual file downloads (for backwards compatibility)
-    if (format === 'image') {
-      res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Disposition', `attachment; filename="${imageFilename}"`);
-      res.setHeader('X-Elara-Signature', session.signature.metaHash);
-      return res.send(session.signedImage);
-    }
+		// Determine content category for naming
+		const _contentType = mimeType.startsWith("audio/")
+			? "audio"
+			: mimeType.startsWith("video/")
+				? "video"
+				: mimeType === "application/pdf"
+					? "document"
+					: "image";
 
-    if (format === 'sidecar') {
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="${sidecarFilename}"`);
-      return res.json(session.sidecar);
-    }
+		const baseName = session.originalName.replace(/\.[^.]+$/, "");
+		const contentFilename = `${baseName}-signed.${ext}`;
+		const sidecarFilename = `${baseName}-sidecar.json`;
+		const bundleFilename = `${baseName}-elarasign-bundle.zip`;
 
-    // Default: ZIP bundle with everything
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${bundleFilename}"`);
-    res.setHeader('X-Elara-Signature', session.signature.metaHash);
+		// Individual file downloads (for backwards compatibility)
+		if (format === "image") {
+			res.setHeader("Content-Type", mimeType);
+			res.setHeader("Content-Disposition", `attachment; filename="${contentFilename}"`);
+			res.setHeader("X-Elara-Signature", session.signature.metaHash);
+			return res.send(session.signedImage);
+		}
 
-    const archive = archiver('zip', { zlib: { level: 9 } });
-    
-    archive.on('error', (err) => {
-      console.error('Archive error:', err);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Failed to create bundle' });
-      }
-    });
+		if (format === "sidecar") {
+			res.setHeader("Content-Type", "application/json");
+			res.setHeader("Content-Disposition", `attachment; filename="${sidecarFilename}"`);
+			return res.json(session.sidecar);
+		}
 
-    // Pipe archive to response
-    archive.pipe(res);
+		// Default: ZIP bundle with everything
+		res.setHeader("Content-Type", "application/zip");
+		res.setHeader("Content-Disposition", `attachment; filename="${bundleFilename}"`);
+		res.setHeader("X-Elara-Signature", session.signature.metaHash);
 
-    // Add signed image
-    archive.append(session.signedImage, { name: imageFilename });
+		const archive = archiver("zip", { zlib: { level: 9 } });
 
-    // Add sidecar JSON (pretty printed for readability)
-    archive.append(JSON.stringify(session.sidecar, null, 2), { name: sidecarFilename });
+		archive.on("error", (err) => {
+			console.error("Archive error:", err);
+			if (!res.headersSent) {
+				res.status(500).json({ error: "Failed to create bundle" });
+			}
+		});
 
-    // Add README
-    const readme = generateReadme(imageFilename, sidecarFilename, session.signature.metaHash);
-    archive.append(readme, { name: 'README.txt' });
+		// Pipe archive to response
+		archive.pipe(res);
 
-    // Finalize
-    await archive.finalize();
+		// Add signed content
+		archive.append(session.signedImage, { name: contentFilename });
 
-    // Schedule deletion
-    setTimeout(() => deleteSession(sessionId), 60000);
-  } catch (error) {
-    console.error('Download error:', error);
-    if (!res.headersSent) {
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  }
+		// Add sidecar JSON (pretty printed for readability)
+		archive.append(JSON.stringify(session.sidecar, null, 2), { name: sidecarFilename });
+
+		// Add README
+		const readme = generateReadme(contentFilename, sidecarFilename, session.signature.metaHash);
+		archive.append(readme, { name: "README.txt" });
+
+		// Finalize
+		await archive.finalize();
+
+		// Schedule deletion
+		setTimeout(() => deleteSession(sessionId), 60000);
+	} catch (error) {
+		console.error("Download error:", error);
+		if (!res.headersSent) {
+			return res.status(500).json({ error: "Internal server error" });
+		}
+	}
 });
 
 // Legacy sidecar endpoint (kept for backwards compatibility)
-router.get('/sidecar/:sessionId', async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-    const session = await getSession(sessionId);
+router.get("/sidecar/:sessionId", async (req, res) => {
+	try {
+		const { sessionId } = req.params;
+		const session = await getSession(sessionId);
 
-    if (!session) {
-      return res.status(404).json({ error: 'Session not found or expired' });
-    }
+		if (!session) {
+			return res.status(404).json({ error: "Session not found or expired" });
+		}
 
-    const sidecarFilename = session.originalName.replace(/\.[^.]+$/, '-sidecar.json');
-    
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename="${sidecarFilename}"`);
+		const sidecarFilename = session.originalName.replace(/\.[^.]+$/, "-sidecar.json");
 
-    return res.json(session.sidecar);
-  } catch (error) {
-    console.error('Sidecar error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
+		res.setHeader("Content-Type", "application/json");
+		res.setHeader("Content-Disposition", `attachment; filename="${sidecarFilename}"`);
+
+		return res.json(session.sidecar);
+	} catch (error) {
+		console.error("Sidecar error:", error);
+		return res.status(500).json({ error: "Internal server error" });
+	}
 });
 
 export { router as downloadRoutes };

@@ -1,5 +1,19 @@
 # elaraSign Preflight Check
-# Verifies gcloud config, authentication, and project access
+#
+# WORKFLOW:
+# =========
+# 1. New user runs: .\preflight.ps1
+#    - Creates gcloud configuration if needed
+#    - Prompts for Google login if not authenticated
+#    - Verifies project access
+#    - Checks Node.js is installed
+#
+# 2. User runs: .\deploy.ps1
+#    - Runs tests (catches broken code)
+#    - Builds TypeScript
+#    - Deploys to Cloud Run
+#
+# All config is read from deploy.config.json - no hardcoded values.
 
 $ErrorActionPreference = "Continue"
 

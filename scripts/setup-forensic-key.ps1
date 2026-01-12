@@ -34,7 +34,7 @@ $existingSecret = gcloud secrets describe $SecretName --project=$ProjectId 2>$nu
 
 if ($existingSecret -and -not $Force) {
     Write-Host ""
-    Write-Host "⚠️  SECRET ALREADY EXISTS!" -ForegroundColor Yellow
+    Write-Host "️  SECRET ALREADY EXISTS!" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "The master key is already configured in Secret Manager." -ForegroundColor White
     Write-Host "If you regenerate it, ALL previously signed images will have" -ForegroundColor White
@@ -51,7 +51,7 @@ if ($existingSecret -and -not $Force) {
 
 if ($Force -and $existingSecret) {
     Write-Host ""
-    Write-Host "⚠️  WARNING: You are about to REPLACE the existing master key!" -ForegroundColor Red
+    Write-Host "️  WARNING: You are about to REPLACE the existing master key!" -ForegroundColor Red
     Write-Host "   All previously signed images will have orphaned forensic data." -ForegroundColor Red
     Write-Host ""
     $confirm = Read-Host "Type 'REPLACE' to confirm"
@@ -97,7 +97,7 @@ gcloud secrets add-iam-policy-binding $SecretName `
 
 Write-Host ""
 Write-Host "╔════════════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║                    ✅ SETUP COMPLETE                               ║" -ForegroundColor Green
+Write-Host "║                     SETUP COMPLETE                               ║" -ForegroundColor Green
 Write-Host "╚════════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
 Write-Host "Your master key is stored securely in Google Secret Manager." -ForegroundColor White

@@ -1,29 +1,39 @@
 {
   "name": "elara-sign",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
-  "description": "Universal file signing service - embed provenance metadata into images",
+  "description": "Universal file signing service - embed provenance metadata into images, PDFs, audio, and video",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "elara-sign": "dist/cli/index.js"
   },
   "scripts": {
+    "setup": "powershell -ExecutionPolicy Bypass -File ./first-time-setup.ps1",
     "dev": "npx kill-port 3010 2>nul & tsx watch src/cloud/server.ts",
     "dev:clean": "powershell -Command \"Get-NetTCPConnection -LocalPort 3010 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }\" & tsx watch src/cloud/server.ts",
     "build": "tsc",
     "build:cli": "tsc && chmod +x dist/cli/index.js",
-    "test": "tsx src/core/signing-core.test.ts",
-    "test:run": "tsx src/core/signing-core.test.ts",
+    "test": "tsx src/testing/test-runner.ts",
+    "test:help": "tsx src/testing/test-runner.ts --help",
+    "helper": "tsx src/testing/helper.ts",
+    "helper:status": "tsx src/testing/helper.ts status",
+    "helper:diagnose": "tsx src/testing/helper.ts diagnose",
     "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
     "format": "biome format --write src/"
   },
   "keywords": [
     "image-signing",
+    "pdf-signing",
+    "audio-signing",
+    "video-signing",
     "provenance",
     "watermark",
     "content-authenticity",
-    "ai-generated"
+    "ai-generated",
+    "elara",
+    "openelara"
   ],
   "author": "OpenElara",
   "license": "MIT",
@@ -39,18 +49,21 @@
     "archiver": "^7.0.1",
     "express": "^5.0.0",
     "multer": "^2.0.0",
+    "pdf-lib": "^1.17.1",
     "piexifjs": "^1.0.6",
     "pngjs": "^7.0.0",
     "sharp": "^0.33.5"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.0",
+    "@biomejs/biome": "^2.0.0",
     "@types/express": "^5.0.0",
     "@types/multer": "^1.4.12",
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.0.0",
     "@types/pngjs": "^6.0.5",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.2.2",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^4.0.0"
   }
 }

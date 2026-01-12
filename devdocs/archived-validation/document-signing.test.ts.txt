@@ -1,0 +1,503 @@
+/**
+ * elaraSign PDF & Audio Signing - Test Suite
+ * ==========================================
+ * 
+ * Tests for PDF signing, audio signing, and video sidecar generation.
+ * 
+ * Run with: npx tsx src/core/document-signing.test.ts
+ * 
+ * @version 2.0.0
+ */
+
+import {
+  signPdf,
+  verifyPdf,
+  hasPdfSignature,
+  ELARA_PDF_MARKER,
+  type PdfSigningMetadata,
+} from './pdf-signing.js';
+
+import {
+  signAudio,
+  verifyAudio,
+  hasAudioSignature,
+  detectAudioFormat,
+  ELARA_AUDIO_MARKER,
+  type AudioSigningMetadata,
+} from './audio-signing.js';
+
+import {
+  createVideoSidecar,
+  verifyVideoSidecar,
+  detectVideoFormat,
+  type VideoSigningMetadata,
+} from './video-signing.js';
+
+// ============================================================================
+// Test Helpers
+// ============================================================================
+
+function createMinimalPdf(): Uint8Array {
+  // Create a minimal valid PDF
+  const pdfContent = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>
+endobj
+xref
+0 4
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+trailer
+<< /Size 4 /Root 1 0 R >>
+startxref
+196
+%%EOF`;
+  return new TextEncoder().encode(pdfContent);
+}
+
+function createMinimalWav(): Uint8Array {
+  // Create minimal WAV file (44 bytes header + 4 bytes of silence)
+  const wav = new Uint8Array(48);
+  const view = new DataView(wav.buffer);
+  
+  // RIFF header
+  wav.set([0x52, 0x49, 0x46, 0x46]); // 'RIFF'
+  view.setUint32(4, 40, true);        // File size - 8
+  wav.set([0x57, 0x41, 0x56, 0x45], 8); // 'WAVE'
+  
+  // fmt chunk
+  wav.set([0x66, 0x6D, 0x74, 0x20], 12); // 'fmt '
+  view.setUint32(16, 16, true);          // Chunk size
+  view.setUint16(20, 1, true);           // Audio format (PCM)
+  view.setUint16(22, 1, true);           // Channels
+  view.setUint32(24, 44100, true);       // Sample rate
+  view.setUint32(28, 88200, true);       // Byte rate
+  view.setUint16(32, 2, true);           // Block align
+  view.setUint16(34, 16, true);          // Bits per sample
+  
+  // data chunk
+  wav.set([0x64, 0x61, 0x74, 0x61], 36); // 'data'
+  view.setUint32(40, 4, true);           // Chunk size
+  // 4 bytes of silence (already zeros)
+  
+  return wav;
+}
+
+function createMinimalMp3(): Uint8Array {
+  // Create minimal MP3 with ID3v2 header
+  const mp3 = new Uint8Array(32);
+  
+  // ID3v2 header
+  mp3[0] = 0x49; // 'I'
+  mp3[1] = 0x44; // 'D'
+  mp3[2] = 0x33; // '3'
+  mp3[3] = 0x03; // Version 2.3
+  mp3[4] = 0x00; // Revision
+  mp3[5] = 0x00; // Flags
+  // Size: 0 (syncsafe)
+  mp3[6] = 0x00;
+  mp3[7] = 0x00;
+  mp3[8] = 0x00;
+  mp3[9] = 0x00;
+  
+  // Fake MP3 frame sync
+  mp3[10] = 0xFF;
+  mp3[11] = 0xFB;
+  
+  return mp3;
+}
+
+function createMinimalMp4(): Uint8Array {
+  // Create minimal MP4 header
+  const mp4 = new Uint8Array(32);
+  
+  // ftyp box
+  const view = new DataView(mp4.buffer);
+  view.setUint32(0, 20, false);  // Box size
+  mp4.set([0x66, 0x74, 0x79, 0x70], 4); // 'ftyp'
+  mp4.set([0x69, 0x73, 0x6F, 0x6D], 8); // 'isom' brand
+  view.setUint32(12, 512, false); // Version
+  mp4.set([0x69, 0x73, 0x6F, 0x6D], 16); // Compatible brand
+  
+  return mp4;
+}
+
+// ============================================================================
+// Test Runner
+// ============================================================================
+
+async function runTests() {
+  console.log('🧪 elaraSign Document Signing - Test Suite\n');
+  console.log('='.repeat(60));
+  
+  let passed = 0;
+  let failed = 0;
+  
+  // ========================================================================
+  // PDF TESTS
+  // ========================================================================
+  
+  console.log('\n📄 PDF SIGNING TESTS\n');
+  
+  // Test 1: Basic PDF signing
+  try {
+    const pdf = createMinimalPdf();
+    const metadata: PdfSigningMetadata = {
+      method: 'ai',
+      generator: 'test-suite',
+      model: 'gpt-4',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'test-fingerprint-123',
+    };
+    
+    const result = await signPdf(pdf, metadata);
+    
+    if (result.signedPdf.length > pdf.length &&
+        result.signatureHash.length === 64 &&
+        result.contentHash.length === 64) {
+      console.log('✅ Test 1: Basic PDF signing');
+      passed++;
+    } else {
+      console.log('❌ Test 1: Basic PDF signing - result validation failed');
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 1: Basic PDF signing -', e);
+    failed++;
+  }
+  
+  // Test 2: PDF verification
+  try {
+    const pdf = createMinimalPdf();
+    const metadata: PdfSigningMetadata = {
+      method: 'human',
+      generator: 'manual-upload',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'user-abc',
+    };
+    
+    const { signedPdf } = await signPdf(pdf, metadata);
+    const verification = await verifyPdf(signedPdf);
+    
+    if (verification.isSigned &&
+        verification.metadata?.method === 'human' &&
+        verification.metadata?.generator === 'manual-upload') {
+      console.log('✅ Test 2: PDF verification');
+      passed++;
+    } else {
+      console.log('❌ Test 2: PDF verification - metadata mismatch');
+      console.log('   Got:', verification);
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 2: PDF verification -', e);
+    failed++;
+  }
+  
+  // Test 3: hasPdfSignature check
+  try {
+    const unsignedPdf = createMinimalPdf();
+    const metadata: PdfSigningMetadata = {
+      method: 'ai',
+      generator: 'test',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'fp',
+    };
+    const { signedPdf } = await signPdf(unsignedPdf, metadata);
+    
+    const unsignedCheck = await hasPdfSignature(unsignedPdf);
+    const signedCheck = await hasPdfSignature(signedPdf);
+    
+    if (!unsignedCheck && signedCheck) {
+      console.log('✅ Test 3: hasPdfSignature detection');
+      passed++;
+    } else {
+      console.log('❌ Test 3: hasPdfSignature detection -', { unsignedCheck, signedCheck });
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 3: hasPdfSignature detection -', e);
+    failed++;
+  }
+  
+  // ========================================================================
+  // AUDIO TESTS
+  // ========================================================================
+  
+  console.log('\n🎵 AUDIO SIGNING TESTS\n');
+  
+  // Test 4: WAV format detection
+  try {
+    const wav = createMinimalWav();
+    const format = detectAudioFormat(wav);
+    
+    if (format === 'wav') {
+      console.log('✅ Test 4: WAV format detection');
+      passed++;
+    } else {
+      console.log('❌ Test 4: WAV format detection - got:', format);
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 4: WAV format detection -', e);
+    failed++;
+  }
+  
+  // Test 5: MP3 format detection
+  try {
+    const mp3 = createMinimalMp3();
+    const format = detectAudioFormat(mp3);
+    
+    if (format === 'mp3') {
+      console.log('✅ Test 5: MP3 format detection');
+      passed++;
+    } else {
+      console.log('❌ Test 5: MP3 format detection - got:', format);
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 5: MP3 format detection -', e);
+    failed++;
+  }
+  
+  // Test 6: WAV signing
+  try {
+    const wav = createMinimalWav();
+    const metadata: AudioSigningMetadata = {
+      method: 'ai',
+      generator: 'together-tts',
+      model: 'cartesia-sonic',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'user-123',
+      voiceModel: 'alloy',
+    };
+    
+    const result = await signAudio(wav, metadata);
+    
+    if (result.signedAudio.length > wav.length &&
+        result.format === 'wav' &&
+        result.embeddingMethod === 'info-chunk' &&
+        result.signatureHash.length === 64) {
+      console.log('✅ Test 6: WAV signing');
+      passed++;
+    } else {
+      console.log('❌ Test 6: WAV signing - validation failed');
+      console.log('   Format:', result.format);
+      console.log('   Method:', result.embeddingMethod);
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 6: WAV signing -', e);
+    failed++;
+  }
+  
+  // Test 7: MP3 signing
+  try {
+    const mp3 = createMinimalMp3();
+    const metadata: AudioSigningMetadata = {
+      method: 'ai',
+      generator: 'openai-tts',
+      model: 'tts-1',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'user-456',
+    };
+    
+    const result = await signAudio(mp3, metadata);
+    
+    if (result.format === 'mp3' &&
+        result.embeddingMethod === 'id3' &&
+        result.signedAudio.length > mp3.length) {
+      console.log('✅ Test 7: MP3 signing');
+      passed++;
+    } else {
+      console.log('❌ Test 7: MP3 signing - validation failed');
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 7: MP3 signing -', e);
+    failed++;
+  }
+  
+  // Test 8: Audio verification
+  try {
+    const wav = createMinimalWav();
+    const metadata: AudioSigningMetadata = {
+      method: 'human',
+      generator: 'recording',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'artist-001',
+    };
+    
+    const { signedAudio } = await signAudio(wav, metadata);
+    const verification = await verifyAudio(signedAudio);
+    
+    if (verification.isSigned &&
+        verification.metadata?.method === 'human') {
+      console.log('✅ Test 8: Audio verification');
+      passed++;
+    } else {
+      console.log('❌ Test 8: Audio verification -', verification);
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 8: Audio verification -', e);
+    failed++;
+  }
+  
+  // Test 9: hasAudioSignature check
+  try {
+    const wav = createMinimalWav();
+    const metadata: AudioSigningMetadata = {
+      method: 'ai',
+      generator: 'test',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'fp',
+    };
+    const { signedAudio } = await signAudio(wav, metadata);
+    
+    const unsignedCheck = await hasAudioSignature(wav);
+    const signedCheck = await hasAudioSignature(signedAudio);
+    
+    if (!unsignedCheck && signedCheck) {
+      console.log('✅ Test 9: hasAudioSignature detection');
+      passed++;
+    } else {
+      console.log('❌ Test 9: hasAudioSignature detection');
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 9: hasAudioSignature detection -', e);
+    failed++;
+  }
+  
+  // ========================================================================
+  // VIDEO TESTS (Sidecar only)
+  // ========================================================================
+  
+  console.log('\n🎬 VIDEO SIDECAR TESTS\n');
+  
+  // Test 10: Video format detection
+  try {
+    const mp4 = createMinimalMp4();
+    const format = detectVideoFormat(mp4);
+    
+    if (format === 'mp4') {
+      console.log('✅ Test 10: Video format detection (MP4)');
+      passed++;
+    } else {
+      console.log('❌ Test 10: Video format detection - got:', format);
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 10: Video format detection -', e);
+    failed++;
+  }
+  
+  // Test 11: Video sidecar creation
+  try {
+    const fakeVideo = new Uint8Array([1, 2, 3, 4, 5]); // Fake video bytes
+    const metadata: VideoSigningMetadata = {
+      method: 'ai',
+      generator: 'sora',
+      model: 'sora-v1',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'user-video-001',
+    };
+    
+    const sidecar = await createVideoSidecar(fakeVideo, metadata, 10.5, 1920, 1080);
+    
+    if (sidecar.version === '2.0' &&
+        sidecar.marker === 'elaraSign-video' &&
+        sidecar.contentHash.length === 64 &&
+        sidecar.duration === 10.5 &&
+        sidecar.resolution.width === 1920) {
+      console.log('✅ Test 11: Video sidecar creation');
+      passed++;
+    } else {
+      console.log('❌ Test 11: Video sidecar creation - validation failed');
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 11: Video sidecar creation -', e);
+    failed++;
+  }
+  
+  // Test 12: Video sidecar verification
+  try {
+    const fakeVideo = new Uint8Array([1, 2, 3, 4, 5]);
+    const metadata: VideoSigningMetadata = {
+      method: 'ai',
+      generator: 'runway',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'user-xyz',
+    };
+    
+    const sidecar = await createVideoSidecar(fakeVideo, metadata, 5, 1280, 720);
+    const verification = await verifyVideoSidecar(fakeVideo, sidecar);
+    
+    if (verification.valid) {
+      console.log('✅ Test 12: Video sidecar verification (valid)');
+      passed++;
+    } else {
+      console.log('❌ Test 12: Video sidecar verification -', verification.error);
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 12: Video sidecar verification -', e);
+    failed++;
+  }
+  
+  // Test 13: Video sidecar tamper detection
+  try {
+    const fakeVideo = new Uint8Array([1, 2, 3, 4, 5]);
+    const metadata: VideoSigningMetadata = {
+      method: 'ai',
+      generator: 'test',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'user',
+    };
+    
+    const sidecar = await createVideoSidecar(fakeVideo, metadata, 5, 1280, 720);
+    
+    // Tamper with video
+    const tamperedVideo = new Uint8Array([1, 2, 3, 4, 6]); // Changed last byte
+    const verification = await verifyVideoSidecar(tamperedVideo, sidecar);
+    
+    if (!verification.valid && verification.error?.includes('modified')) {
+      console.log('✅ Test 13: Video sidecar tamper detection');
+      passed++;
+    } else {
+      console.log('❌ Test 13: Video sidecar tamper detection - should fail');
+      failed++;
+    }
+  } catch (e) {
+    console.log('❌ Test 13: Video sidecar tamper detection -', e);
+    failed++;
+  }
+  
+  // ========================================================================
+  // SUMMARY
+  // ========================================================================
+  
+  console.log('\n' + '='.repeat(60));
+  console.log(`\n📊 Results: ${passed} passed, ${failed} failed\n`);
+  
+  if (failed === 0) {
+    console.log('🎉 All tests passed!\n');
+    process.exit(0);
+  } else {
+    console.log('❌ Some tests failed.\n');
+    process.exit(1);
+  }
+}
+
+// Run tests
+runTests().catch(console.error);

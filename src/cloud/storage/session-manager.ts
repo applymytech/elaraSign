@@ -11,23 +11,23 @@
  * - The download IS the original (not a copy)
  */
 
-import crypto from 'node:crypto';
+import crypto from "node:crypto";
 
 interface Session {
-  id: string;
-  signedImage: Buffer;
-  originalName: string;
-  mimeType: string;
-  signature: {
-    metaHash: string;
-    locations: string[];
-    timestamp: string;
-  };
-  metadata: object;
-  sidecar: object;
-  createdAt: Date;
-  expiresAt: Date;
-  downloaded: boolean;
+	id: string;
+	signedImage: Buffer;
+	originalName: string;
+	mimeType: string;
+	signature: {
+		metaHash: string;
+		locations: string[];
+		timestamp: string;
+	};
+	metadata: object;
+	sidecar: object;
+	createdAt: Date;
+	expiresAt: Date;
+	downloaded: boolean;
 }
 
 // In-memory storage (use Redis/DB in production)
@@ -36,95 +36,93 @@ const sessions = new Map<string, Session>();
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 export async function createSession(data: {
-  signedImage: Buffer;
-  originalName: string;
-  mimeType?: string;
-  signature: { metaHash: string; locations: string[]; timestamp: string };
-  metadata: object;
-  sidecar?: object; // Optional: use enhanced sidecar from standard-metadata.ts
+	signedImage: Buffer;
+	originalName: string;
+	mimeType?: string;
+	signature: { metaHash: string; locations: string[]; timestamp: string };
+	metadata: object;
+	sidecar?: object; // Optional: use enhanced sidecar from standard-metadata.ts
 }): Promise<Session> {
-  const id = crypto.randomBytes(16).toString('hex');
-  const now = new Date();
+	const id = crypto.randomBytes(16).toString("hex");
+	const now = new Date();
 
-  // Use provided sidecar or build a basic one from metadata and signature
-  const sidecar = data.sidecar || {
-    elaraSign: {
-      version: '2.0',
-      ...data.signature,
-    },
-    metadata: data.metadata,
-    signedAt: data.signature.timestamp,
-  };
+	// Use provided sidecar or build a basic one from metadata and signature
+	const sidecar = data.sidecar || {
+		elaraSign: {
+			version: "2.0",
+			...data.signature,
+		},
+		metadata: data.metadata,
+		signedAt: data.signature.timestamp,
+	};
 
-  const session: Session = {
-    id,
-    signedImage: data.signedImage,
-    originalName: data.originalName,
-    mimeType: data.mimeType || 'image/png',
-    signature: data.signature,
-    metadata: data.metadata,
-    sidecar,
-    createdAt: now,
-    expiresAt: new Date(now.getTime() + SESSION_TIMEOUT_MS),
-    downloaded: false,
-  };
+	const session: Session = {
+		id,
+		signedImage: data.signedImage,
+		originalName: data.originalName,
+		mimeType: data.mimeType || "image/png",
+		signature: data.signature,
+		metadata: data.metadata,
+		sidecar,
+		createdAt: now,
+		expiresAt: new Date(now.getTime() + SESSION_TIMEOUT_MS),
+		downloaded: false,
+	};
 
-  sessions.set(id, session);
-  return session;
+	sessions.set(id, session);
+	return session;
 }
 
 export async function getSession(id: string): Promise<Session | null> {
-  const session = sessions.get(id);
+	const session = sessions.get(id);
 
-  if (!session) {
-    return null;
-  }
+	if (!session) {
+		return null;
+	}
 
-  // Check if expired
-  if (new Date() > session.expiresAt) {
-    sessions.delete(id);
-    return null;
-  }
+	// Check if expired
+	if (new Date() > session.expiresAt) {
+		sessions.delete(id);
+		return null;
+	}
 
-  return session;
+	return session;
 }
 
 export async function markDownloaded(id: string): Promise<void> {
-  const session = sessions.get(id);
-  if (session) {
-    session.downloaded = true;
-  }
+	const session = sessions.get(id);
+	if (session) {
+		session.downloaded = true;
+	}
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  sessions.delete(id);
+	sessions.delete(id);
 }
 
 // Cleanup job
 export const sessionCleanup = {
-  interval: null as NodeJS.Timeout | null,
+	interval: null as NodeJS.Timeout | null,
 
-  start(intervalMs = 60000) {
-    this.interval = setInterval(() => {
-      const now = new Date();
-      let cleaned = 0;
+	start(intervalMs = 60000) {
+		this.interval = setInterval(() => {
+			const now = new Date();
+			let _cleaned = 0;
 
-      for (const [id, session] of sessions.entries()) {
-        if (now > session.expiresAt) {
-          sessions.delete(id);
-          cleaned++;
-        }
-      }
+			for (const [id, session] of sessions.entries()) {
+				if (now > session.expiresAt) {
+					sessions.delete(id);
+					_cleaned++;
+				}
+			}
 
-      if (cleaned > 0) {
-        console.log(`🧹 Cleaned ${cleaned} expired sessions`);
-      }
-    }, intervalMs);
-  },
+			// Session cleanup runs silently - no console output in production
+		}, intervalMs);
+	},
 
-  stop() {
-    if (this.interval) {
-      clearInterval(this.interval);
-    }
-  },
+	stop() {
+		if (this.interval) {
+			clearInterval(this.interval);
+		}
+	},
 };

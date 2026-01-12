@@ -33,13 +33,13 @@ Write-Host ""
 # Step 1: Create or select project
 # ============================================================================
 
-Write-Host "📋 Step 1: Project Setup" -ForegroundColor Yellow
+Write-Host " Step 1: Project Setup" -ForegroundColor Yellow
 Write-Host ""
 
 # Check if project exists
 $existingProject = gcloud projects describe $ProjectId 2>&1
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "   ✅ Project '$ProjectId' already exists" -ForegroundColor Green
+    Write-Host "    Project '$ProjectId' already exists" -ForegroundColor Green
 } else {
     Write-Host "   Creating project '$ProjectId'..." -ForegroundColor Cyan
     gcloud projects create $ProjectId --name="elaraSign"
@@ -47,7 +47,7 @@ if ($LASTEXITCODE -eq 0) {
     if ($BillingAccountId) {
         gcloud billing projects link $ProjectId --billing-account=$BillingAccountId
     } else {
-        Write-Host "   ⚠️ No billing account specified. Link manually in Cloud Console." -ForegroundColor Yellow
+        Write-Host "   ️ No billing account specified. Link manually in Cloud Console." -ForegroundColor Yellow
     }
 }
 
@@ -58,7 +58,7 @@ gcloud config set project $ProjectId
 # ============================================================================
 
 Write-Host ""
-Write-Host "📋 Step 2: Enable APIs" -ForegroundColor Yellow
+Write-Host " Step 2: Enable APIs" -ForegroundColor Yellow
 Write-Host ""
 
 $apis = @(
@@ -72,27 +72,27 @@ foreach ($api in $apis) {
     Write-Host "   Enabling $api..." -ForegroundColor Cyan
     gcloud services enable $api --quiet
 }
-Write-Host "   ✅ All APIs enabled" -ForegroundColor Green
+Write-Host "    All APIs enabled" -ForegroundColor Green
 
 # ============================================================================
 # Step 3: Create Artifact Registry
 # ============================================================================
 
 Write-Host ""
-Write-Host "📋 Step 3: Artifact Registry" -ForegroundColor Yellow
+Write-Host " Step 3: Artifact Registry" -ForegroundColor Yellow
 Write-Host ""
 
 $repoName = "elara-sign-repo"
 $existingRepo = gcloud artifacts repositories describe $repoName --location=$Region 2>&1
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "   ✅ Repository '$repoName' already exists" -ForegroundColor Green
+    Write-Host "    Repository '$repoName' already exists" -ForegroundColor Green
 } else {
     Write-Host "   Creating Artifact Registry repository..." -ForegroundColor Cyan
     gcloud artifacts repositories create $repoName `
         --repository-format=docker `
         --location=$Region `
         --description="elaraSign Docker images"
-    Write-Host "   ✅ Repository created" -ForegroundColor Green
+    Write-Host "    Repository created" -ForegroundColor Green
 }
 
 # ============================================================================
@@ -100,7 +100,7 @@ if ($LASTEXITCODE -eq 0) {
 # ============================================================================
 
 Write-Host ""
-Write-Host "📋 Step 4: IAM Permissions" -ForegroundColor Yellow
+Write-Host " Step 4: IAM Permissions" -ForegroundColor Yellow
 Write-Host ""
 
 $projectNumber = (gcloud projects describe $ProjectId --format="value(projectNumber)")
@@ -118,7 +118,7 @@ gcloud projects add-iam-policy-binding $ProjectId `
     --role="roles/iam.serviceAccountUser" `
     --quiet 2>&1 | Out-Null
 
-Write-Host "   ✅ Permissions configured" -ForegroundColor Green
+Write-Host "    Permissions configured" -ForegroundColor Green
 
 # ============================================================================
 # Summary
@@ -126,7 +126,7 @@ Write-Host "   ✅ Permissions configured" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║                         ✅ SETUP COMPLETE                                    ║" -ForegroundColor Green
+Write-Host "║                          SETUP COMPLETE                                    ║" -ForegroundColor Green
 Write-Host "╚══════════════════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
 Write-Host "   Project: $ProjectId" -ForegroundColor White

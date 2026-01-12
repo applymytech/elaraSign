@@ -1,0 +1,117 @@
+/**
+ * REAL PDF Test - No fake minimal PDFs
+ * Tests signPdfWithLibrary against actual PDF structure
+ */
+
+import { signPdf, verifyPdf } from './pdf-signing.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+async function runRealPdfTest() {
+  console.log('🔬 REAL PDF SIGNING TEST\n');
+  console.log('='.repeat(60));
+  
+  // Create a real PDF using pdf-lib directly
+  console.log('\n1. Creating a real PDF with pdf-lib...');
+  
+  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+  
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([612, 792]); // Letter size
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  
+  page.drawText('This is a test PDF for elaraSign', {
+    x: 50,
+    y: 700,
+    size: 24,
+    font,
+    color: rgb(0, 0, 0),
+  });
+  
+  page.drawText('Created to test real PDF signing functionality.', {
+    x: 50,
+    y: 660,
+    size: 14,
+    font,
+    color: rgb(0.3, 0.3, 0.3),
+  });
+  
+  const originalPdfBytes = await pdfDoc.save();
+  console.log(`   Created PDF: ${originalPdfBytes.length} bytes`);
+  
+  // Test 1: PDF-lib based signing (the real implementation)
+  console.log('\n2. Testing signPdf (pdf-lib based)...');
+  try {
+    const result = await signPdf(new Uint8Array(originalPdfBytes), {
+      method: 'ai',
+      generator: 'test-suite',
+      model: 'test-model',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'test-fingerprint-abc123',
+    });
+    
+    console.log(`   Signing succeeded`);
+    console.log(`   Original: ${originalPdfBytes.length} bytes`);
+    console.log(`   Signed: ${result.signedPdf.length} bytes`);
+    console.log(`   Signature hash: ${result.signatureHash.slice(0, 32)}...`);
+    
+    // Save to disk and check if it's valid
+    const testDir = path.join(process.cwd(), 'test-output');
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir);
+    }
+    
+    const outputPath = path.join(testDir, 'signed-test.pdf');
+    fs.writeFileSync(outputPath, result.signedPdf);
+    console.log(`   Saved to: ${outputPath}`);
+    
+    // Try to reload and verify it's still a valid PDF
+    const reloaded = fs.readFileSync(outputPath);
+    const reloadedDoc = await PDFDocument.load(reloaded);
+    console.log(`   Reloaded PDF has ${reloadedDoc.getPageCount()} page(s)`);
+    
+    // Check if our metadata is there
+    const creator = reloadedDoc.getCreator();
+    const keywords = reloadedDoc.getKeywords();
+    const subject = reloadedDoc.getSubject();
+    console.log(`   Creator: ${creator}`);
+    console.log(`   Keywords: ${keywords}`);
+    console.log(`   Subject: ${subject}`);
+    
+    if (creator?.includes('elaraSign')) {
+      console.log('   ✅ elaraSign creator found');
+    } else {
+      console.log('   ❌ elaraSign creator NOT found');
+    }
+    
+    if (keywords?.includes('elara-signed')) {
+      console.log('   ✅ elara-signed keyword found');
+    } else {
+      console.log('   ❌ elara-signed keyword NOT found');
+    }
+    
+    // Test verification
+    console.log('\n3. Testing verifyPdf...');
+    const verification = await verifyPdf(result.signedPdf);
+    console.log(`   isSigned: ${verification.isSigned}`);
+    console.log(`   layersFound: ${JSON.stringify(verification.layersFound)}`);
+    console.log(`   signatureHash: ${verification.signatureHash?.slice(0, 32)}...`);
+    console.log(`   method: ${verification.metadata?.method}`);
+    console.log(`   generator: ${verification.metadata?.generator}`);
+    
+    if (verification.isSigned && verification.metadata?.method === 'ai') {
+      console.log('   ✅ Verification successful');
+    } else {
+      console.log('   ❌ Verification failed');
+    }
+    
+  } catch (e) {
+    console.log(`   ❌ FAIL: ${e}`);
+    console.log(e);
+  }
+  
+  console.log('\n' + '='.repeat(60));
+  console.log('Test complete.');
+}
+
+runRealPdfTest().catch(console.error);

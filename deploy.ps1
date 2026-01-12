@@ -1,5 +1,19 @@
 # elaraSign Deployment Script
-# Reads all config from deploy.config.json
+#
+# WORKFLOW:
+# =========
+# 1. First time? Run .\preflight.ps1 to set up gcloud
+# 2. Run .\deploy.ps1 to deploy
+#    - Verifies gcloud config and authentication
+#    - Runs tests (use -SkipTests to skip)
+#    - Builds TypeScript
+#    - Deploys to Cloud Run
+#
+# OPTIONS:
+#   -SkipTests   Skip running tests
+#   -LocalOnly   Build and run locally in Docker (no deploy)
+#
+# All config is read from deploy.config.json - no hardcoded values.
 
 param(
     [switch]$SkipTests,

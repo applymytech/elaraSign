@@ -1,0 +1,252 @@
+/**
+ * REAL Audio Test - Creates actual audio files and tests signing
+ * 
+ * @fileoverview Node.js test file for audio signing with real file I/O
+ * 
+ * TYPESCRIPT CONFIGURATION REQUIREMENTS:
+ * - This file requires @types/node (already in devDependencies)
+ * - tsconfig.json must include "types": ["node"] for node: protocol imports
+ * - tsconfig.json must include "DOM" in lib array for console support
+ * - See tsconfig.test.json for test-specific configuration
+ * 
+ * WHY THESE REQUIREMENTS:
+ * - node:fs, node:path: Node.js built-in modules with explicit protocol
+ * - console: Standard logging API (requires DOM lib in TypeScript)
+ * - process: Node.js global for CWD and exit codes
+ * 
+ * If TypeScript still shows errors after config changes, restart the TS server:
+ * VS Code: Ctrl+Shift+P → "TypeScript: Restart TS Server"
+ */
+
+import { signAudio, verifyAudio, hasAudioSignature, detectAudioFormat } from './audio-signing.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+/**
+ * Create a real WAV file with actual audio data
+ */
+function createRealWav(durationMs: number = 100, sampleRate: number = 44100): Uint8Array {
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const numSamples = Math.floor(sampleRate * (durationMs / 1000));
+  const dataSize = numSamples * numChannels * (bitsPerSample / 8);
+  const fileSize = 44 + dataSize;
+  
+  const wav = new Uint8Array(fileSize);
+  const view = new DataView(wav.buffer);
+  
+  // RIFF header
+  wav.set([0x52, 0x49, 0x46, 0x46]); // 'RIFF'
+  view.setUint32(4, fileSize - 8, true);
+  wav.set([0x57, 0x41, 0x56, 0x45], 8); // 'WAVE'
+  
+  // fmt chunk
+  wav.set([0x66, 0x6D, 0x74, 0x20], 12); // 'fmt '
+  view.setUint32(16, 16, true); // Chunk size
+  view.setUint16(20, 1, true); // Audio format (PCM)
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true); // Byte rate
+  view.setUint16(32, numChannels * (bitsPerSample / 8), true); // Block align
+  view.setUint16(34, bitsPerSample, true);
+  
+  // data chunk
+  wav.set([0x64, 0x61, 0x74, 0x61], 36); // 'data'
+  view.setUint32(40, dataSize, true);
+  
+  // Generate a simple sine wave (440Hz A note)
+  const frequency = 440;
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const sample = Math.sin(2 * Math.PI * frequency * t) * 0.5;
+    const intSample = Math.floor(sample * 32767);
+    view.setInt16(44 + i * 2, intSample, true);
+  }
+  
+  return wav;
+}
+
+/**
+ * Create a real MP3 file (minimal valid structure)
+ * Note: This creates a valid MP3 frame structure
+ */
+function createRealMp3(): Uint8Array {
+  // Create a minimal MP3 with a valid frame
+  // MP3 frame: sync (0xFFE0-0xFFFF) + header + data
+  const frameSize = 417; // Typical frame size for 128kbps
+  const numFrames = 3;
+  const mp3 = new Uint8Array(numFrames * frameSize);
+  
+  for (let f = 0; f < numFrames; f++) {
+    const offset = f * frameSize;
+    
+    // Frame sync (11 bits all 1s)
+    mp3[offset + 0] = 0xFF;
+    // MPEG Audio Layer 3, 128kbps, 44100Hz, stereo
+    mp3[offset + 1] = 0xFB; // MPEG1 Layer3
+    mp3[offset + 2] = 0x90; // 128kbps, 44100Hz
+    mp3[offset + 3] = 0x00; // No padding, stereo
+    
+    // Fill rest with pseudo-random data (simulating compressed audio)
+    for (let i = 4; i < frameSize; i++) {
+      mp3[offset + i] = (i * 7 + f * 13) % 256;
+    }
+  }
+  
+  return mp3;
+}
+
+async function runRealAudioTest() {
+  console.log('🔬 REAL AUDIO SIGNING TEST\n');
+  console.log('='.repeat(60));
+  
+  const testDir = path.join(process.cwd(), 'test-output');
+  if (!fs.existsSync(testDir)) {
+    fs.mkdirSync(testDir);
+  }
+  
+  // =========================================================================
+  // WAV Test
+  // =========================================================================
+  
+  console.log('\n📢 WAV SIGNING TEST\n');
+  
+  console.log('1. Creating real WAV file...');
+  const originalWav = createRealWav(100, 44100);
+  console.log(`   Created WAV: ${originalWav.length} bytes`);
+  console.log(`   Format detected: ${detectAudioFormat(originalWav)}`);
+  
+  // Save original
+  const originalWavPath = path.join(testDir, 'original.wav');
+  fs.writeFileSync(originalWavPath, originalWav);
+  console.log(`   Saved original to: ${originalWavPath}`);
+  
+  console.log('\n2. Signing WAV...');
+  try {
+    const wavResult = await signAudio(originalWav, {
+      method: 'ai',
+      generator: 'together-tts',
+      model: 'cartesia-sonic',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'test-user-wav-123',
+      voiceModel: 'alloy',
+    });
+    
+    console.log(`   Signing succeeded`);
+    console.log(`   Original: ${originalWav.length} bytes`);
+    console.log(`   Signed: ${wavResult.signedAudio.length} bytes`);
+    console.log(`   Embedding method: ${wavResult.embeddingMethod}`);
+    console.log(`   Signature hash: ${wavResult.signatureHash.slice(0, 32)}...`);
+    
+    // Save signed WAV
+    const signedWavPath = path.join(testDir, 'signed.wav');
+    fs.writeFileSync(signedWavPath, wavResult.signedAudio);
+    console.log(`   Saved signed to: ${signedWavPath}`);
+    
+    // Reload and verify format is still valid
+    console.log('\n3. Verifying signed WAV...');
+    const reloadedWav = fs.readFileSync(signedWavPath);
+    console.log(`   Reloaded: ${reloadedWav.length} bytes`);
+    console.log(`   Format still valid: ${detectAudioFormat(new Uint8Array(reloadedWav)) === 'wav'}`);
+    
+    // Verify signature
+    const wavVerification = await verifyAudio(new Uint8Array(reloadedWav));
+    console.log(`   isSigned: ${wavVerification.isSigned}`);
+    console.log(`   method: ${wavVerification.metadata?.method}`);
+    console.log(`   generator: ${wavVerification.metadata?.generator}`);
+    console.log(`   signatureHash: ${wavVerification.signatureHash?.slice(0, 32)}...`);
+    
+    if (wavVerification.isSigned && wavVerification.metadata?.method === 'ai') {
+      console.log('   ✅ WAV signing and verification successful');
+    } else {
+      console.log('   ❌ WAV verification failed');
+    }
+    
+    // Check with hasAudioSignature
+    const hasSignature = await hasAudioSignature(new Uint8Array(reloadedWav));
+    console.log(`   hasAudioSignature: ${hasSignature}`);
+    
+  } catch (e) {
+    console.log(`   ❌ WAV FAIL: ${e}`);
+    console.log(e);
+  }
+  
+  // =========================================================================
+  // MP3 Test
+  // =========================================================================
+  
+  console.log('\n\n📢 MP3 SIGNING TEST\n');
+  
+  console.log('1. Creating real MP3 file...');
+  const originalMp3 = createRealMp3();
+  console.log(`   Created MP3: ${originalMp3.length} bytes`);
+  console.log(`   Format detected: ${detectAudioFormat(originalMp3)}`);
+  
+  // Save original
+  const originalMp3Path = path.join(testDir, 'original.mp3');
+  fs.writeFileSync(originalMp3Path, originalMp3);
+  console.log(`   Saved original to: ${originalMp3Path}`);
+  
+  console.log('\n2. Signing MP3...');
+  try {
+    const mp3Result = await signAudio(originalMp3, {
+      method: 'human',
+      generator: 'recording',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'test-user-mp3-456',
+    });
+    
+    console.log(`   Signing succeeded`);
+    console.log(`   Original: ${originalMp3.length} bytes`);
+    console.log(`   Signed: ${mp3Result.signedAudio.length} bytes`);
+    console.log(`   Embedding method: ${mp3Result.embeddingMethod}`);
+    console.log(`   Signature hash: ${mp3Result.signatureHash.slice(0, 32)}...`);
+    
+    // Save signed MP3
+    const signedMp3Path = path.join(testDir, 'signed.mp3');
+    fs.writeFileSync(signedMp3Path, mp3Result.signedAudio);
+    console.log(`   Saved signed to: ${signedMp3Path}`);
+    
+    // Reload and verify
+    console.log('\n3. Verifying signed MP3...');
+    const reloadedMp3 = fs.readFileSync(signedMp3Path);
+    console.log(`   Reloaded: ${reloadedMp3.length} bytes`);
+    console.log(`   Format detected: ${detectAudioFormat(new Uint8Array(reloadedMp3))}`);
+    
+    const mp3Verification = await verifyAudio(new Uint8Array(reloadedMp3));
+    console.log(`   isSigned: ${mp3Verification.isSigned}`);
+    console.log(`   method: ${mp3Verification.metadata?.method}`);
+    console.log(`   generator: ${mp3Verification.metadata?.generator}`);
+    
+    if (mp3Verification.isSigned && mp3Verification.metadata?.method === 'human') {
+      console.log('   ✅ MP3 signing and verification successful');
+    } else {
+      console.log('   ❌ MP3 verification failed');
+    }
+    
+  } catch (e) {
+    console.log(`   ❌ MP3 FAIL: ${e}`);
+    console.log(e);
+  }
+  
+  // =========================================================================
+  // Unsigned detection test
+  // =========================================================================
+  
+  console.log('\n\n📢 UNSIGNED DETECTION TEST\n');
+  
+  const unsignedWav = createRealWav(50, 22050);
+  const unsignedCheck = await hasAudioSignature(unsignedWav);
+  console.log(`   Unsigned WAV hasAudioSignature: ${unsignedCheck}`);
+  
+  if (!unsignedCheck) {
+    console.log('   ✅ Correctly identified unsigned audio');
+  } else {
+    console.log('   ❌ False positive on unsigned audio');
+  }
+  
+  console.log('\n' + '='.repeat(60));
+  console.log('Audio test complete.');
+}
+
+runRealAudioTest().catch(console.error);

@@ -5,11 +5,10 @@
  * Local command-line tool for signing and verifying files.
  */
 
-import { parseArgs } from 'node:util';
-import { signCommand } from './commands/sign.js';
-import { verifyCommand } from './commands/verify.js';
+import { signCommand } from "./commands/sign.js";
+import { verifyCommand } from "./commands/verify.js";
 
-const VERSION = '2.0.0';
+const VERSION = "2.0.0";
 
 const HELP = `
 elaraSign CLI v${VERSION}
@@ -33,36 +32,36 @@ EXAMPLES:
 `;
 
 async function main() {
-  const args = process.argv.slice(2);
+	const args = process.argv.slice(2);
 
-  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
-    console.log(HELP);
-    process.exit(0);
-  }
+	if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
+		console.log(HELP);
+		process.exit(0);
+	}
 
-  if (args.includes('--version') || args.includes('-v')) {
-    console.log(`elara-sign v${VERSION}`);
-    process.exit(0);
-  }
+	if (args.includes("--version") || args.includes("-v")) {
+		console.log(`elara-sign v${VERSION}`);
+		process.exit(0);
+	}
 
-  const command = args[0];
-  const commandArgs = args.slice(1);
+	const command = args[0];
+	const commandArgs = args.slice(1);
 
-  switch (command) {
-    case 'sign':
-      await signCommand(commandArgs);
-      break;
-    case 'verify':
-      await verifyCommand(commandArgs);
-      break;
-    default:
-      console.error(`Unknown command: ${command}`);
-      console.log(HELP);
-      process.exit(1);
-  }
+	switch (command) {
+		case "sign":
+			await signCommand(commandArgs);
+			break;
+		case "verify":
+			await verifyCommand(commandArgs);
+			break;
+		default:
+			console.error(`Unknown command: ${command}`);
+			console.log(HELP);
+			process.exit(1);
+	}
 }
 
 main().catch((error) => {
-  console.error('Error:', error.message);
-  process.exit(1);
+	console.error("Error:", error.message);
+	process.exit(1);
 });

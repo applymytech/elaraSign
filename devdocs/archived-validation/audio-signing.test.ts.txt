@@ -1,0 +1,498 @@
+/**
+ * elaraSign Audio Signing - Real File Test
+ * =========================================
+ * 
+ * Tests audio signing against actual audio files, not minimal stubs.
+ * 
+ * Run with: npx tsx src/core/audio-signing.test.ts
+ */
+
+import {
+  signAudio,
+  verifyAudio,
+  hasAudioSignature,
+  detectAudioFormat,
+  ELARA_AUDIO_MARKER,
+  type AudioSigningMetadata,
+} from './audio-signing.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+// ============================================================================
+// Test Helpers: Create REAL audio files
+// ============================================================================
+
+/**
+ * Create a valid WAV file with actual audio data (1 second of 440Hz sine wave)
+ */
+function createRealWavFile(durationSeconds: number = 1, sampleRate: number = 44100): Uint8Array {
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const numSamples = sampleRate * durationSeconds;
+  const dataSize = numSamples * numChannels * (bitsPerSample / 8);
+  
+  // Total file size: 44 byte header + data
+  const fileSize = 44 + dataSize;
+  const buffer = new ArrayBuffer(fileSize);
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+  
+  // RIFF header
+  bytes.set([0x52, 0x49, 0x46, 0x46], 0); // 'RIFF'
+  view.setUint32(4, fileSize - 8, true);   // File size - 8
+  bytes.set([0x57, 0x41, 0x56, 0x45], 8); // 'WAVE'
+  
+  // fmt chunk
+  bytes.set([0x66, 0x6D, 0x74, 0x20], 12); // 'fmt '
+  view.setUint32(16, 16, true);            // Chunk size (16 for PCM)
+  view.setUint16(20, 1, true);             // Audio format (1 = PCM)
+  view.setUint16(22, numChannels, true);   // Channels
+  view.setUint32(24, sampleRate, true);    // Sample rate
+  view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true); // Byte rate
+  view.setUint16(32, numChannels * (bitsPerSample / 8), true); // Block align
+  view.setUint16(34, bitsPerSample, true); // Bits per sample
+  
+  // data chunk
+  bytes.set([0x64, 0x61, 0x74, 0x61], 36); // 'data'
+  view.setUint32(40, dataSize, true);      // Data size
+  
+  // Generate 440Hz sine wave
+  const frequency = 440;
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const sample = Math.sin(2 * Math.PI * frequency * t);
+    const intSample = Math.floor(sample * 32767);
+    view.setInt16(44 + i * 2, intSample, true);
+  }
+  
+  return bytes;
+}
+
+/**
+ * Create a valid MP3 file with ID3v2 header and minimal frame data
+ * This creates a technically valid MP3 structure
+ */
+function createRealMp3File(): Uint8Array {
+  // Create ID3v2.3 header + a minimal MP3 frame
+  const parts: Uint8Array[] = [];
+  
+  // ID3v2.3 header with empty tag
+  const id3Header = new Uint8Array([
+    0x49, 0x44, 0x33,  // 'ID3'
+    0x03, 0x00,        // Version 2.3.0
+    0x00,              // Flags
+    0x00, 0x00, 0x00, 0x00, // Size (syncsafe, 0)
+  ]);
+  parts.push(id3Header);
+  
+  // MP3 frame header (MPEG Audio Layer 3)
+  // This is a minimal valid MP3 frame
+  // Frame sync + version + layer + protection
+  const mp3Frame = new Uint8Array([
+    0xFF, 0xFB,        // Frame sync + MPEG1 Layer3
+    0x90,              // 128kbps, 44100Hz, padding off
+    0x00,              // Private bit, channel mode, etc
+  ]);
+  
+  // Add some padding to make it look like real audio data
+  const padding = new Uint8Array(417); // Standard frame size for 128kbps
+  for (let i = 0; i < padding.length; i++) {
+    padding[i] = Math.floor(Math.random() * 256);
+  }
+  
+  parts.push(mp3Frame);
+  parts.push(padding);
+  
+  // Add a few more frames
+  for (let f = 0; f < 10; f++) {
+    parts.push(new Uint8Array([0xFF, 0xFB, 0x90, 0x00]));
+    const framePadding = new Uint8Array(413);
+    for (let i = 0; i < framePadding.length; i++) {
+      framePadding[i] = Math.floor(Math.random() * 256);
+    }
+    parts.push(framePadding);
+  }
+  
+  // Combine all parts
+  const totalLength = parts.reduce((sum, p) => sum + p.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.length;
+  }
+  
+  return result;
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+async function runTests() {
+  console.log('🧪 elaraSign Audio Signing - Real File Tests\n');
+  console.log('='.repeat(60));
+  
+  let passed = 0;
+  let failed = 0;
+  
+  // ------------------------------------------------------------------------
+  // Test 1: Create and sign a real WAV file
+  // ------------------------------------------------------------------------
+  console.log('\n🎵 Test 1: Sign a real WAV file');
+  
+  try {
+    const wavBytes = createRealWavFile(1, 44100);
+    console.log(`   Original WAV size: ${wavBytes.length} bytes`);
+    console.log(`   Duration: 1 second, 44100Hz, 16-bit mono`);
+    
+    const metadata: AudioSigningMetadata = {
+      method: 'ai',
+      generator: 'test-suite',
+      model: 'cartesia-sonic',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'test-user-fp',
+      voiceModel: 'alloy',
+    };
+    
+    const result = await signAudio(wavBytes, metadata);
+    
+    console.log(`   Signed WAV size: ${result.signedAudio.length} bytes`);
+    console.log(`   Embedding method: ${result.embeddingMethod}`);
+    console.log(`   Signature hash: ${result.signatureHash.slice(0, 16)}...`);
+    
+    // Verify it's still valid WAV
+    const isValidWav = result.signedAudio[0] === 0x52 && // R
+                       result.signedAudio[1] === 0x49 && // I
+                       result.signedAudio[2] === 0x46 && // F
+                       result.signedAudio[3] === 0x46 && // F
+                       result.signedAudio[8] === 0x57;   // W
+    
+    if (result.signedAudio.length > wavBytes.length &&
+        result.format === 'wav' &&
+        result.embeddingMethod === 'info-chunk' &&
+        isValidWav) {
+      console.log('   ✅ PASSED: WAV signed with valid INFO chunk');
+      passed++;
+    } else {
+      console.log('   ❌ FAILED: Invalid signing result');
+      failed++;
+    }
+  } catch (e) {
+    console.log(`   ❌ FAILED: ${e}`);
+    failed++;
+  }
+  
+  // ------------------------------------------------------------------------
+  // Test 2: Sign a real MP3 file
+  // ------------------------------------------------------------------------
+  console.log('\n🎵 Test 2: Sign a real MP3 file');
+  
+  try {
+    const mp3Bytes = createRealMp3File();
+    console.log(`   Original MP3 size: ${mp3Bytes.length} bytes`);
+    
+    const metadata: AudioSigningMetadata = {
+      method: 'ai',
+      generator: 'together-tts',
+      model: 'xtts-v2',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'mp3-test-fp',
+    };
+    
+    const result = await signAudio(mp3Bytes, metadata);
+    
+    console.log(`   Signed MP3 size: ${result.signedAudio.length} bytes`);
+    console.log(`   Embedding method: ${result.embeddingMethod}`);
+    
+    // Verify it starts with ID3
+    const startsWithId3 = result.signedAudio[0] === 0x49 && // I
+                          result.signedAudio[1] === 0x44 && // D
+                          result.signedAudio[2] === 0x33;   // 3
+    
+    if (result.format === 'mp3' &&
+        result.embeddingMethod === 'id3' &&
+        startsWithId3) {
+      console.log('   ✅ PASSED: MP3 signed with valid ID3v2 tag');
+      passed++;
+    } else {
+      console.log('   ❌ FAILED: Invalid signing result');
+      failed++;
+    }
+  } catch (e) {
+    console.log(`   ❌ FAILED: ${e}`);
+    failed++;
+  }
+  
+  // ------------------------------------------------------------------------
+  // Test 3: Verify signed WAV
+  // ------------------------------------------------------------------------
+  console.log('\n🎵 Test 3: Verify signed WAV metadata');
+  
+  try {
+    const wavBytes = createRealWavFile(0.5, 22050);
+    
+    const metadata: AudioSigningMetadata = {
+      method: 'human',
+      generator: 'recording-app',
+      generatedAt: '2026-01-11T12:00:00.000Z',
+      userFingerprint: 'human-artist',
+    };
+    
+    const { signedAudio, signatureHash } = await signAudio(wavBytes, metadata);
+    const verification = await verifyAudio(signedAudio);
+    
+    console.log(`   isSigned: ${verification.isSigned}`);
+    console.log(`   method: ${verification.metadata?.method}`);
+    console.log(`   generator: ${verification.metadata?.generator}`);
+    
+    if (verification.isSigned &&
+        verification.metadata?.method === 'human' &&
+        verification.metadata?.generator === 'recording-app' &&
+        verification.signatureHash === signatureHash) {
+      console.log('   ✅ PASSED: WAV metadata verified');
+      passed++;
+    } else {
+      console.log('   ❌ FAILED: Verification mismatch');
+      console.log('   Full result:', JSON.stringify(verification, null, 2));
+      failed++;
+    }
+  } catch (e) {
+    console.log(`   ❌ FAILED: ${e}`);
+    failed++;
+  }
+  
+  // ------------------------------------------------------------------------
+  // Test 4: Verify signed MP3
+  // ------------------------------------------------------------------------
+  console.log('\n🎵 Test 4: Verify signed MP3 metadata');
+  
+  try {
+    const mp3Bytes = createRealMp3File();
+    
+    const metadata: AudioSigningMetadata = {
+      method: 'ai',
+      generator: 'openai-tts',
+      model: 'tts-1-hd',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'openai-user',
+      voiceModel: 'nova',
+    };
+    
+    const { signedAudio, signatureHash } = await signAudio(mp3Bytes, metadata);
+    const verification = await verifyAudio(signedAudio);
+    
+    console.log(`   isSigned: ${verification.isSigned}`);
+    console.log(`   method: ${verification.metadata?.method}`);
+    console.log(`   model: ${verification.metadata?.model}`);
+    
+    if (verification.isSigned &&
+        verification.metadata?.method === 'ai' &&
+        verification.metadata?.generator === 'openai-tts') {
+      console.log('   ✅ PASSED: MP3 metadata verified');
+      passed++;
+    } else {
+      console.log('   ❌ FAILED: Verification mismatch');
+      failed++;
+    }
+  } catch (e) {
+    console.log(`   ❌ FAILED: ${e}`);
+    failed++;
+  }
+  
+  // ------------------------------------------------------------------------
+  // Test 5: hasAudioSignature detection
+  // ------------------------------------------------------------------------
+  console.log('\n🎵 Test 5: hasAudioSignature detection');
+  
+  try {
+    const wavBytes = createRealWavFile(0.1, 8000);
+    const { signedAudio } = await signAudio(wavBytes, {
+      method: 'ai',
+      generator: 'test',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'fp',
+    });
+    
+    const unsignedCheck = await hasAudioSignature(wavBytes);
+    const signedCheck = await hasAudioSignature(signedAudio);
+    
+    console.log(`   Unsigned detected as signed: ${unsignedCheck}`);
+    console.log(`   Signed detected as signed: ${signedCheck}`);
+    
+    if (!unsignedCheck && signedCheck) {
+      console.log('   ✅ PASSED: Correct detection');
+      passed++;
+    } else {
+      console.log('   ❌ FAILED: Detection incorrect');
+      failed++;
+    }
+  } catch (e) {
+    console.log(`   ❌ FAILED: ${e}`);
+    failed++;
+  }
+  
+  // ------------------------------------------------------------------------
+  // Test 6: Save WAV to disk and reload
+  // ------------------------------------------------------------------------
+  console.log('\n🎵 Test 6: Save WAV to disk and reload');
+  
+  try {
+    const wavBytes = createRealWavFile(0.5, 44100);
+    
+    const { signedAudio, signatureHash } = await signAudio(wavBytes, {
+      method: 'ai',
+      generator: 'disk-test',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'disk-fp',
+    });
+    
+    // Save to disk
+    const testFilePath = path.join(process.cwd(), 'test-files', 'test-signed.wav');
+    fs.writeFileSync(testFilePath, signedAudio);
+    console.log(`   Saved to: ${testFilePath}`);
+    console.log(`   File size: ${signedAudio.length} bytes`);
+    
+    // Reload and verify
+    const reloadedBytes = fs.readFileSync(testFilePath);
+    const verification = await verifyAudio(new Uint8Array(reloadedBytes));
+    
+    // Clean up
+    fs.unlinkSync(testFilePath);
+    
+    if (verification.isSigned && 
+        verification.signatureHash === signatureHash) {
+      console.log('   ✅ PASSED: Signature survives disk I/O');
+      passed++;
+    } else {
+      console.log('   ❌ FAILED: Signature lost after disk I/O');
+      failed++;
+    }
+  } catch (e) {
+    console.log(`   ❌ FAILED: ${e}`);
+    failed++;
+  }
+  
+  // ------------------------------------------------------------------------
+  // Test 7: Save MP3 to disk and reload
+  // ------------------------------------------------------------------------
+  console.log('\n🎵 Test 7: Save MP3 to disk and reload');
+  
+  try {
+    const mp3Bytes = createRealMp3File();
+    
+    const { signedAudio, signatureHash } = await signAudio(mp3Bytes, {
+      method: 'ai',
+      generator: 'mp3-disk-test',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'mp3-disk-fp',
+    });
+    
+    // Save to disk
+    const testFilePath = path.join(process.cwd(), 'test-files', 'test-signed.mp3');
+    fs.writeFileSync(testFilePath, signedAudio);
+    console.log(`   Saved to: ${testFilePath}`);
+    
+    // Reload and verify
+    const reloadedBytes = fs.readFileSync(testFilePath);
+    const verification = await verifyAudio(new Uint8Array(reloadedBytes));
+    
+    // Clean up
+    fs.unlinkSync(testFilePath);
+    
+    if (verification.isSigned && 
+        verification.signatureHash === signatureHash) {
+      console.log('   ✅ PASSED: MP3 signature survives disk I/O');
+      passed++;
+    } else {
+      console.log('   ❌ FAILED: MP3 signature lost');
+      failed++;
+    }
+  } catch (e) {
+    console.log(`   ❌ FAILED: ${e}`);
+    failed++;
+  }
+  
+  // ------------------------------------------------------------------------
+  // Test 8: Format detection
+  // ------------------------------------------------------------------------
+  console.log('\n🎵 Test 8: Format detection');
+  
+  try {
+    const wav = createRealWavFile(0.1, 8000);
+    const mp3 = createRealMp3File();
+    
+    const wavFormat = detectAudioFormat(wav);
+    const mp3Format = detectAudioFormat(mp3);
+    
+    console.log(`   WAV detected as: ${wavFormat}`);
+    console.log(`   MP3 detected as: ${mp3Format}`);
+    
+    if (wavFormat === 'wav' && mp3Format === 'mp3') {
+      console.log('   ✅ PASSED: Correct format detection');
+      passed++;
+    } else {
+      console.log('   ❌ FAILED: Wrong format detection');
+      failed++;
+    }
+  } catch (e) {
+    console.log(`   ❌ FAILED: ${e}`);
+    failed++;
+  }
+  
+  // ------------------------------------------------------------------------
+  // Test 9: All optional metadata fields preserved
+  // ------------------------------------------------------------------------
+  console.log('\n🎵 Test 9: All optional fields preserved');
+  
+  try {
+    const wavBytes = createRealWavFile(0.1, 8000);
+    
+    const metadata: AudioSigningMetadata = {
+      method: 'ai',
+      generator: 'full-test',
+      model: 'whisper-large',
+      generatedAt: new Date().toISOString(),
+      userFingerprint: 'full-fp',
+      voiceModel: 'custom-voice-001',
+      characterId: 'char-elara',
+    };
+    
+    const { signedAudio } = await signAudio(wavBytes, metadata);
+    const verification = await verifyAudio(signedAudio);
+    
+    console.log(`   voiceModel: ${verification.metadata?.voiceModel}`);
+    console.log(`   characterId: ${verification.metadata?.characterId}`);
+    
+    if (verification.metadata?.voiceModel === 'custom-voice-001' &&
+        verification.metadata?.characterId === 'char-elara') {
+      console.log('   ✅ PASSED: Optional fields preserved');
+      passed++;
+    } else {
+      console.log('   ❌ FAILED: Optional fields missing');
+      failed++;
+    }
+  } catch (e) {
+    console.log(`   ❌ FAILED: ${e}`);
+    failed++;
+  }
+  
+  // ========================================================================
+  // Summary
+  // ========================================================================
+  
+  console.log('\n' + '='.repeat(60));
+  console.log(`\n📊 Results: ${passed} passed, ${failed} failed\n`);
+  
+  if (failed === 0) {
+    console.log('✅ All audio tests passed.\n');
+  } else {
+    console.log('❌ Some audio tests failed.\n');
+    process.exit(1);
+  }
+}
+
+runTests().catch(e => {
+  console.error('Test suite error:', e);
+  process.exit(1);
+});
