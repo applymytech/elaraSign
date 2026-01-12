@@ -31,6 +31,14 @@ npm-debug.log*
 .preview-revision
 .last-live-revision
 
+# Working docs (engineer's local experiments)
+devdocs/workingdocs/*
+!devdocs/workingdocs/README.md
+
+# Deploy logs (local accountability trail)
+devdocs/deploy-logs/*
+!devdocs/deploy-logs/README.md
+
 # Test output
 coverage/
 test-output/

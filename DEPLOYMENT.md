@@ -1,178 +1,279 @@
-# elaraSign Cloud Run Deployment Guide
+# elaraSign Deployment Guide
 
-## Quick Start (Recommended)
+## Configuration Pattern
 
-Use the setup wizard for first-time deployment:
+**All deployment scripts are DYNAMIC - no hardcoded values.**
 
-```powershell
-.\scripts\setup-wizard.ps1
+```
+deploy.config.json          ← Your actual values (GITIGNORED - stays local)
+deploy.config.template.json ← Template for new users (IN REPO)
 ```
 
-For subsequent deployments:
+### First-Time Setup
+
+1. Copy the template:
+   ```powershell
+   Copy-Item deploy.config.template.json deploy.config.json
+   ```
+
+2. Edit `deploy.config.json` with your values:
+   ```json
+   {
+     "gcloud": {
+       "configuration": "elarasign",
+       "account": "your-email@example.com",
+       "project": "your-gcp-project-id",
+       "region": "us-central1"
+     },
+     "service": {
+       "name": "elara-sign",
+       "domain": "sign.yourdomain.com"
+     },
+     "banned": {
+       "patterns": ["client-project", "wrong-account@email.com"]
+     }
+   }
+   ```
+
+3. Run preflight to verify:
+   ```powershell
+   .\preflight.ps1
+   ```
+
+---
+
+## Full Deployment Workflow
+
+### The Professional Pattern
+
+```
+.\deploy-checklist.ps1  Human decisions (version, docs, accountability)
+        │
+        ▼
+.\preflight.ps1         Environment validation
+        │
+        ▼
+.\deploy-preview.ps1    Deploy WITHOUT traffic (safe testing)
+        │
+        ▼
+   Test preview URL
+        │
+        ▼
+.\deploy-promote.ps1    Shift 100% traffic to preview
+        │
+        ▼
+   If issues discovered:
+.\deploy-rollback.ps1   Emergency revert to previous
+```
+
+### Step 1: Pre-Deploy Checklist
 
 ```powershell
-.\scripts\preflight.ps1              # Pre-deployment checks
-gcloud builds submit --config=cloudbuild.yaml --project=elarasign-prod --substitutions=SHORT_SHA=v1
-.\scripts\smoke-test.ps1             # Verify deployment
+.\deploy-checklist.ps1
+```
+
+This prompts for:
+- **Version bump**: Patch (+0.0.1), Minor (+0.1.0), or Major (+1.0.0)
+- **Documentation check**: Is it current or stale?
+- **Change summary**: What was done (accountability)
+- **Completeness**: Complete, Framework/Stubs, or WIP
+
+All decisions are logged to `devdocs/deploy-logs/`.
+
+### Step 2: Preflight
+
+```powershell
+.\preflight.ps1
+```
+
+Validates environment is ready (gcloud, lint, build).
+
+### Step 3: Deploy Preview
+
+```powershell
+.\deploy-preview.ps1
+```
+
+Deploys without routing traffic. Test the preview URL.
+
+### Step 4: Promote or Rollback
+
+```powershell
+.\deploy-promote.ps1      # Go live
+.\deploy-rollback.ps1     # If issues
+```
+
+### Commands
+
+| Command | Purpose |
+|---------|---------|
+| `.\preflight.ps1` | Verify environment is ready |
+| `.\deploy-preview.ps1` | Deploy new version WITHOUT traffic |
+| `.\deploy-promote.ps1` | Shift traffic to preview (go live) |
+| `.\deploy-promote.ps1 -Gradual` | Gradual rollout: 10% → 50% → 100% |
+| `.\deploy-rollback.ps1` | Emergency revert to previous version |
+| `.\deploy-rollback.ps1 -List` | Show available revisions |
+| `.\deploy-status.ps1` | Show current deployment state |
+
+### Example: Safe Deployment
+
+```powershell
+# 1. Verify everything is ready
+.\preflight.ps1
+
+# 2. Deploy preview (no traffic)
+.\deploy-preview.ps1
+# Output: Preview URL: https://elara-sign-abc123-uc.a.run.app
+
+# 3. Test the preview URL manually
+# - Check health endpoint
+# - Test signing/verification
+# - Verify UI works
+
+# 4. If good, go live
+.\deploy-promote.ps1
+# Type: PROMOTE
+
+# 5. If issues after promotion
+.\deploy-rollback.ps1
+# Type: ROLLBACK
 ```
 
 ---
 
-## Prerequisites Checklist
+## Enforcement Hierarchy
 
-Before deploying, ensure ALL of the following are complete:
-
-### 1. GCP Project Setup
-
-```powershell
-# Create project (if not exists)
-gcloud projects create elarasign-prod --name="elaraSign Production"
-
-# Set as active project
-gcloud config set project elarasign-prod
+```
+HEAVEN (architecture-review/elara-engineer)
+│   Strict universal rules + runs actual linters
+│   May flag things this app legitimately ignores
+│   Use: npx tsx elara-engineer/compliance-enforcer.ts --app=elaraSign
+│
+▼
+APP PREFLIGHT (.\preflight.ps1)
+│   App-specific rules with legitimate ignores
+│   Uses this app's biome.json
+│   THIS GATES DEPLOYMENT (must pass)
+│
+▼
+DEPLOY
 ```
 
-### 2. Billing
-
-Link billing account via Cloud Console:
-- https://console.cloud.google.com/billing/linkedaccount?project=elarasign-prod
-
-Or via CLI:
-```powershell
-gcloud billing accounts list
-gcloud billing projects link elarasign-prod --billing-account=YOUR_BILLING_ACCOUNT_ID
-```
-
-### 3. Enable Required APIs
-
-```powershell
-gcloud services enable cloudbuild.googleapis.com artifactregistry.googleapis.com run.googleapis.com --project=elarasign-prod
-```
-
-### 4. Create Artifact Registry Repository
-
-**This is commonly missed and causes "Repository not found" errors.**
-
-```powershell
-gcloud artifacts repositories create elara-sign-repo --repository-format=docker --location=us-central1 --project=elarasign-prod
-```
-
-### 5. IAM Permissions
-
-Grant your account owner access (if needed):
-```powershell
-gcloud projects add-iam-policy-binding elarasign-prod --member="user:YOUR_EMAIL@domain.com" --role="roles/owner"
-```
-
-Grant Cloud Build permission to deploy to Cloud Run:
-```powershell
-# Get the Cloud Build service account
-PROJECT_NUMBER=$(gcloud projects describe elarasign-prod --format='value(projectNumber)')
-
-# Grant Cloud Run Admin role
-gcloud projects add-iam-policy-binding elarasign-prod --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" --role="roles/run.admin"
-
-# Grant Service Account User role (to act as the runtime service account)
-gcloud projects add-iam-policy-binding elarasign-prod --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" --role="roles/iam.serviceAccountUser"
-```
-
-### 6. Forensic Accountability Key (Optional but Recommended)
-
-The forensic master key enables "break glass" accountability - encrypted data embedded in signed images that only you (the operator) can decrypt upon request from authorities.
-
-**Run this ONCE per project:**
-
-```powershell
-.\scripts\setup-forensic-key.ps1
-```
-
-This will:
-1. Generate a 256-bit master key
-2. Store it in Google Secret Manager
-3. Grant Cloud Run access to read it
-4. Display the key for you to save offline
-
-**⚠️ IMPORTANT:** Save the displayed key somewhere safe (offline/physical). If you lose it, forensic data in signed images cannot be recovered.
-
-**The key persists across all deployments.** Never regenerate it unless you intentionally want to orphan old signatures.
+**VS Code Problems panel is NOT the truth source.** Running actual linters is.
 
 ---
 
-## Deployment
+## What Preflight Checks
 
-### Build and Deploy
-
-```powershell
-gcloud builds submit --config=cloudbuild.yaml --project=elarasign-prod --substitutions=SHORT_SHA=v1
-```
-
-### Check Build Logs (if failed)
-
-```powershell
-gcloud builds list --project=elarasign-prod --limit=1
-gcloud builds log BUILD_ID --project=elarasign-prod
-```
+| Check | What It Verifies |
+|-------|------------------|
+| [1] gcloud CLI | gcloud command available |
+| [2] Configuration | Named config exists (from deploy.config.json) |
+| [3] Authentication | Account is logged in |
+| [4] Project Access | Can access the GCP project |
+| [5] Node.js | Node.js installed |
+| [6] Dependencies | node_modules exists |
+| [7] Biome Lint | **0 errors AND 0 warnings** |
+| [8] TypeScript | Code compiles successfully |
 
 ---
 
-## Custom Domain Setup
+## Files Overview
 
-### 1. Verify Domain Ownership (first time only)
-
-```powershell
-gcloud domains verify openelara.org --project=elarasign-prod
-```
-
-### 2. Map Custom Domain to Cloud Run Service
-
-```powershell
-gcloud run domain-mappings create --service=elara-sign --domain=sign.openelara.org --region=us-central1 --project=elarasign-prod
-```
-
-### 3. Configure DNS
-
-Add the DNS records Google provides (typically):
-- **CNAME**: `sign` -> `ghs.googlehosted.com`
-
-Or for apex domains, A records pointing to Google's IPs.
-
-### 4. Wait for SSL
-
-SSL certificate provisioning takes 15-30 minutes. Check status:
-```powershell
-gcloud run domain-mappings describe --domain=sign.openelara.org --region=us-central1 --project=elarasign-prod
-```
+| File | Purpose | In Git? |
+|------|---------|---------|
+| `deploy.config.json` | Your deployment config | **No** (gitignored) |
+| `deploy.config.template.json` | Template for new users | Yes |
+| `preflight.ps1` | Pre-deploy validation | Yes |
+| `deploy.ps1` | Direct deploy (legacy) | Yes |
+| `deploy-preview.ps1` | Deploy without traffic | Yes |
+| `deploy-promote.ps1` | Shift traffic to preview | Yes |
+| `deploy-rollback.ps1` | Emergency revert | Yes |
+| `deploy-status.ps1` | Show current state | Yes |
+| `.preview-revision` | Tracks pending preview | **No** (gitignored) |
+| `.last-live-revision` | Tracks rollback target | **No** (gitignored) |
 
 ---
 
-## Common Errors and Solutions
+## GCP Prerequisites
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `Repository "elara-sign-repo" not found` | Artifact Registry repo doesn't exist | Run: `gcloud artifacts repositories create elara-sign-repo --repository-format=docker --location=us-central1 --project=elarasign-prod` |
-| `PERMISSION_DENIED: Cloud Build API not enabled` | APIs not enabled | Run: `gcloud services enable cloudbuild.googleapis.com --project=elarasign-prod` |
-| `Billing account not found` | Project not linked to billing | Link via Console or `gcloud billing projects link` |
-| `TypeScript compilation errors` | Code issues | Run `npm run build` locally first to catch errors |
-| `Cloud Run Admin role required` | Cloud Build can't deploy | Grant `roles/run.admin` to Cloud Build service account |
+Before first deployment, ensure:
+
+1. **GCP Project exists**
+2. **Billing enabled**
+3. **APIs enabled:**
+   ```powershell
+   gcloud services enable cloudbuild.googleapis.com artifactregistry.googleapis.com run.googleapis.com
+   ```
+4. **Artifact Registry repo created:**
+   ```powershell
+   gcloud artifacts repositories create elara-sign-repo --repository-format=docker --location=us-central1
+   ```
+5. **Cloud Build has deployment permissions:**
+   ```powershell
+   PROJECT_NUMBER=$(gcloud projects describe YOUR_PROJECT --format='value(projectNumber)')
+   gcloud projects add-iam-policy-binding YOUR_PROJECT \
+     --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+     --role="roles/run.admin"
+   gcloud projects add-iam-policy-binding YOUR_PROJECT \
+     --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+     --role="roles/iam.serviceAccountUser"
+   ```
 
 ---
 
-## Quick Deploy (All Prerequisites Met)
+## Troubleshooting
 
-If everything is already set up:
+| Issue | Solution |
+|-------|----------|
+| "deploy.config.json not found" | Copy template: `Copy-Item deploy.config.template.json deploy.config.json` |
+| "Account not authenticated" | Run: `gcloud auth login` |
+| "Cannot access project" | Check project ID in config, verify billing enabled |
+| "Biome found warnings" | Run: `npm run lint:fix` then retry |
+| "TypeScript build failed" | Run: `npm run build` locally to see errors |
+| "No preview revision found" | Run `deploy-preview.ps1` before `deploy-promote.ps1` |
 
-```powershell
-cd C:\myCodeProjects\elaraSign
-npm run build                    # Verify locally first
-gcloud builds submit --config=cloudbuild.yaml --project=elarasign-prod --substitutions=SHORT_SHA=v1
+---
+
+## Project Isolation
+
+**NEVER deploy to wrong projects.** The `banned.patterns` in config blocks deployment if detected:
+
+```json
+"banned": {
+  "patterns": ["wrong-project", "client@email.com"]
+}
 ```
 
+This prevents accidental cross-contamination between projects.
+
 ---
 
-## Project Isolation Warning
+## Developer Documentation
 
-This project (`elarasign-prod`) is separate from:
-- `openelaracloud` - OpenElara Cloud web app
-- `phillabor-crm` - Completely unrelated project
+### Working Docs (`devdocs/workingdocs/`)
 
-NEVER deploy elaraSign to those projects.
+This folder is for **engineer experiments during development**:
+- Test scripts
+- Debug utilities  
+- Temporary investigation code
+- Proof-of-concept files
+
+**This folder is gitignored** (except README.md). Use it freely without cluttering git history.
+
+### Deploy Logs (`devdocs/deploy-logs/`)
+
+Created automatically by `deploy-checklist.ps1`. Each deployment creates a timestamped log:
+
+```
+deploy-2025-06-18-103045.log
+```
+
+Contains:
+- Version bump decision (patch/minor/major)
+- Documentation status (updated/stale)
+- Change summary (what was done)
+- Completeness status (complete/partial)
+- Timestamp and engineer notes
+
+**These logs are gitignored** but provide local accountability trail.
