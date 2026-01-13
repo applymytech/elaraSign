@@ -1,5 +1,21 @@
 # elaraSign - Copilot Instructions
 
+## 🚨 DEPLOYMENT SAFETY RULES 🚨
+
+```
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    ⛔ ABSOLUTELY BANNED OPERATIONS ⛔                            ║
+║                                                                                 ║
+║  🚫 NEVER run: gcloud deploy, docker push, git push                            ║
+║  🚫 NEVER run ANY deployment commands automatically                            ║
+║  🚫 NEVER run ANY command that modifies remote repositories                    ║
+║                                                                                 ║
+║  ✅ BEFORE deployment: Verify gcloud project is 'elarasign'                    ║
+║  ✅ SUGGEST commands to user - let them execute                                ║
+║  ✅ HUMAN IN THE LOOP: User must approve all Cloud Run deployments             ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+```
+
 ## ⚠️ CRITICAL: This is the Content Provenance Standard
 
 ```
