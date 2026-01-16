@@ -62,6 +62,12 @@ steps:
       # Same key persists across all deployments (never regenerate!)
       - '--set-secrets'
       - 'ELARASIGN_MASTER_KEY=elarasign-master-key:latest'
+      # Bind P12 certificate and password from Secret Manager
+      # These secrets are created via: scripts/setup-p12-certificate.sh
+      - '--set-secrets'
+      - 'ELARASIGN_P12_BASE64=elarasign-p12-certificate:latest'
+      - '--set-secrets'
+      - 'ELARASIGN_P12_PASSWORD=elarasign-p12-password:latest'
 
 images:
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}'

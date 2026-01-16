@@ -1003,7 +1003,7 @@
     <div id="sign-video-panel" class="panel">
       <div class="info-box">
         <h4>🎬 Video Signing</h4>
-        <p>Creates sidecar JSON with content hash. Video file unchanged (lossless approach).</p>
+        <p>Creates sidecar JSON with content hash and metadata. Video file unchanged (sidecar approach for lossless compatibility).</p>
       </div>
 
       <div class="drop-zone" onclick="document.getElementById('sign-video-file').click()" 
@@ -1051,7 +1051,7 @@
     <div id="sign-audio-panel" class="panel">
       <div class="info-box">
         <h4>🎵 Audio Signing</h4>
-        <p>Embeds metadata in WAV header or creates sidecar for compressed formats.</p>
+        <p>Creates sidecar JSON with content hash and metadata. Audio file unchanged (sidecar approach for format compatibility).</p>
       </div>
 
       <div class="drop-zone" onclick="document.getElementById('sign-audio-file').click()" 
@@ -1155,10 +1155,10 @@
            ondragleave="this.classList.remove('dragover')"
            ondrop="handleDrop(event, 'verify')">
         <div class="icon">🔍</div>
-        <p><strong>Drop any file here</strong></p>
-        <p>Images, Videos, Audio, PDFs</p>
+        <p><strong>Drop file here</strong></p>
+        <p>Images or PDFs only</p>
       </div>
-      <input type="file" id="verify-file" accept="image/*,video/*,audio/*,application/pdf" onchange="handleFileSelect(this, 'verify')">
+      <input type="file" id="verify-file" accept="image/*,application/pdf" onchange="handleFileSelect(this, 'verify')">
 
       <button class="primary" id="verify-btn" onclick="verifyFile()" disabled>Verify File</button>
       <div id="verify-result" class="result"></div>
@@ -1232,6 +1232,12 @@
       
       document.querySelectorAll('.panel').forEach(p => { p.classList.remove('active'); });
       document.getElementById(`sign-${type}-panel`).classList.add('active');
+      
+      // Update form fields based on current method selection
+      if (type === 'image') updateImageFields();
+      else if (type === 'video') updateVideoFields();
+      else if (type === 'audio') updateAudioFields();
+      else if (type === 'document') updateDocumentFields();
     }
 
     function handleDrop(e, type) {
@@ -1278,6 +1284,11 @@
         const creatorName = document.getElementById(`${type}-creator-name`)?.value || '';
         const creatorEmail = document.getElementById(`${type}-creator-email`)?.value || '';
         formData.append('generator', `Human: ${creatorName} <${creatorEmail}>`);
+      } else if (method === 'mixed') {
+        const creatorName = document.getElementById(`${type}-creator-name`)?.value || '';
+        const creatorEmail = document.getElementById(`${type}-creator-email`)?.value || '';
+        const aiTool = document.getElementById(`${type}-generator`).value || 'Unknown AI Tool';
+        formData.append('generator', `AI-Assisted: ${aiTool} by ${creatorName} <${creatorEmail}>`);
       } else {
         formData.append('generator', document.getElementById(`${type}-generator`).value || 'elaraSign.web');
       }
@@ -1311,6 +1322,70 @@
       btn.textContent = `Sign ${type.charAt(0).toUpperCase() + type.slice(1)}`;
     }
 
+    function updateImageFields() {
+      const method = document.getElementById('image-method').value;
+      const humanFields = document.getElementById('image-human-fields');
+      const generatorGroup = document.getElementById('image-generator-group');
+      const generatorLabel = document.getElementById('image-generator-label');
+      const aiFields = document.getElementById('image-ai-fields');
+
+      if (method === 'human') {
+        humanFields.style.display = 'grid';
+        generatorGroup.style.display = 'none';
+        aiFields.style.display = 'none';
+      } else if (method === 'ai') {
+        humanFields.style.display = 'none';
+        generatorGroup.style.display = 'block';
+        generatorLabel.textContent = 'Generator / Tool';
+        aiFields.style.display = 'grid';
+      } else if (method === 'mixed') {
+        humanFields.style.display = 'grid';
+        generatorGroup.style.display = 'block';
+        generatorLabel.textContent = 'AI Tool';
+        aiFields.style.display = 'grid';
+      }
+    }
+
+    function updateVideoFields() {
+      const method = document.getElementById('video-method').value;
+      const humanFields = document.getElementById('video-human-fields');
+      const generatorGroup = document.getElementById('video-generator-group');
+      const generatorLabel = document.getElementById('video-generator-label');
+
+      if (method === 'human') {
+        humanFields.style.display = 'grid';
+        generatorGroup.style.display = 'none';
+      } else if (method === 'ai') {
+        humanFields.style.display = 'none';
+        generatorGroup.style.display = 'block';
+        generatorLabel.textContent = 'Generator / Tool';
+      } else if (method === 'mixed') {
+        humanFields.style.display = 'grid';
+        generatorGroup.style.display = 'block';
+        generatorLabel.textContent = 'AI Tool';
+      }
+    }
+
+    function updateAudioFields() {
+      const method = document.getElementById('audio-method').value;
+      const humanFields = document.getElementById('audio-human-fields');
+      const generatorGroup = document.getElementById('audio-generator-group');
+      const generatorLabel = document.getElementById('audio-generator-label');
+
+      if (method === 'human') {
+        humanFields.style.display = 'grid';
+        generatorGroup.style.display = 'none';
+      } else if (method === 'ai') {
+        humanFields.style.display = 'none';
+        generatorGroup.style.display = 'block';
+        generatorLabel.textContent = 'Generator / Tool';
+      } else if (method === 'mixed') {
+        humanFields.style.display = 'grid';
+        generatorGroup.style.display = 'block';
+        generatorLabel.textContent = 'AI Tool';
+      }
+    }
+
     function updateDocumentFields() {
       const method = document.getElementById('document-method').value;
       const humanFields = document.getElementById('document-human-fields');
@@ -1320,10 +1395,14 @@
       if (method === 'human') {
         humanFields.style.display = 'grid';
         generatorGroup.style.display = 'none';
-      } else {
+      } else if (method === 'ai') {
         humanFields.style.display = 'none';
         generatorGroup.style.display = 'block';
-        generatorLabel.textContent = method === 'ai' ? 'Generator / Tool' : 'Primary Tool';
+        generatorLabel.textContent = 'Generator / Tool';
+      } else if (method === 'mixed') {
+        humanFields.style.display = 'grid';
+        generatorGroup.style.display = 'block';
+        generatorLabel.textContent = 'AI Tool';
       }
     }
 
