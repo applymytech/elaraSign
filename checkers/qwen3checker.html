@@ -94,16 +94,16 @@
     // EMBEDDED elaraSign v2.0 Core (from signing-core.ts)
     // ========================================================================
     const ELARA_MARKER = 'ELARA2';
-    const ELARA_VERSION = 0x02;
+    const _ELARA_VERSION = 0x02;
     const SIGNATURE_LOCATIONS = {
-        topLeft: { name: 'top-left', width: 32, height: 4, getPosition: (w, h) => ({ x: 0, y: 0 }) },
-        topRight: { name: 'top-right', width: 4, height: 32, getPosition: (w, h) => ({ x: w - 4, y: 0 }) },
+        topLeft: { name: 'top-left', width: 32, height: 4, getPosition: (_w, _h) => ({ x: 0, y: 0 }) },
+        topRight: { name: 'top-right', width: 4, height: 32, getPosition: (w, _h) => ({ x: w - 4, y: 0 }) },
         bottomCenter: { name: 'bottom-center', width: 32, height: 4, getPosition: (w, h) => ({ x: Math.floor((w - 32) / 2), y: h - 4 }) },
     };
-    const MIN_IMAGE_SIZE = { width: 64, height: 36 };
+    const _MIN_IMAGE_SIZE = { width: 64, height: 36 };
     const SIGNATURE_LAYOUT = { marker: 6, version: 1, locationId: 1, metaHash: 16, contentHash: 16, timestamp: 4, checksum: 4, total: 48 };
     const BLOCK_CAPACITY = 64;
-    const LOCATION_IDS = { topLeft: 0, topRight: 1, bottomCenter: 2 };
+    const _LOCATION_IDS = { topLeft: 0, topRight: 1, bottomCenter: 2 };
 
     // CRC-32 Table
     const CRC32_TABLE = (() => {
@@ -127,12 +127,12 @@
     }
 
     function unpackSignature(signature) {
-        if (signature.length < SIGNATURE_LAYOUT.total) return null;
+        if (signature.length < SIGNATURE_LAYOUT.total) { return null; }
         let offset = 0;
         const markerBytes = signature.slice(offset, offset + SIGNATURE_LAYOUT.marker);
         const marker = new TextDecoder().decode(markerBytes);
         offset += SIGNATURE_LAYOUT.marker;
-        if (marker !== ELARA_MARKER) return null;
+        if (marker !== ELARA_MARKER) { return null; }
 
         const version = signature[offset]; offset += SIGNATURE_LAYOUT.version;
         const locationId = signature[offset]; offset += SIGNATURE_LAYOUT.locationId;
@@ -162,7 +162,7 @@
         let nibbleIndex = 0;
         for (let dy = 0; dy < blockHeight; dy++) {
             for (let dx = 0; dx < blockWidth; dx++) {
-                if (result.length >= BLOCK_CAPACITY) break;
+                if (result.length >= BLOCK_CAPACITY) { break; }
                 const x = pos.x + dx;
                 const y = pos.y + dy;
                 const pixelIndex = (y * width + x) * 4;
@@ -181,7 +181,7 @@
         }
         const signature = new Uint8Array(result);
         const marker = new TextDecoder().decode(signature.slice(0, 6));
-        if (marker !== ELARA_MARKER) return null;
+        if (marker !== ELARA_MARKER) { return null; }
         return signature;
     }
 
@@ -249,11 +249,11 @@
 
     dropArea.addEventListener('drop', (e) => {
       const files = e.dataTransfer.files;
-      if (files.length) processFile(files[0]);
+      if (files.length) { processFile(files[0]); }
     });
 
     async function handleFile(e) {
-      if (e.target.files.length) await processFile(e.target.files[0]);
+      if (e.target.files.length) { await processFile(e.target.files[0]); }
     }
 
     async function processFile(file) {
@@ -289,7 +289,7 @@
           const metaHashHex = arrayToHex(best.metaHash);
           const contentHashHex = arrayToHex(best.contentHash);
 
-          let html = `
+          const html = `
             <div class="status success">
               ✅ Valid elaraSign v2.0 signature detected!
             </div>

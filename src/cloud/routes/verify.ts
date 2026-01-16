@@ -18,10 +18,10 @@ import sharp from "sharp";
 import { decryptAccountability, isValidMasterKey } from "../../core/forensic-crypto.js";
 import { hasElaraSignature, readSignature, verifyImageContent } from "../../core/signing-core.js";
 import { extractSpreadSpectrum } from "../../core/spread-spectrum.js";
-import { 
+import {
 	type BillboardMetadata,
-	extractJpegElaraMetadata, 
-	extractPngElaraMetadata 
+	extractJpegElaraMetadata,
+	extractPngElaraMetadata,
 } from "../../core/standard-metadata.js";
 import { extractForensicPayload, verifyPdfSignature } from "./sign.js";
 
@@ -105,9 +105,11 @@ router.post("/verify", upload.single("file"), async (req, res) => {
 			billboard = extractJpegElaraMetadata(buffer);
 		} else if (mimetype === "image/png" || format === "png") {
 			// Sharp returns PNG text chunks in metadata
-			billboard = extractPngElaraMetadata(imageMetadata as { 
-				comments?: Array<{ keyword: string; text: string }> 
-			});
+			billboard = extractPngElaraMetadata(
+				imageMetadata as {
+					comments?: Array<{ keyword: string; text: string }>;
+				},
+			);
 		}
 
 		// Get raw RGBA pixel data for steganographic analysis
@@ -214,18 +216,20 @@ router.post("/verify", upload.single("file"), async (req, res) => {
 				validLocations: sigInfo.validLocations,
 			},
 			// Billboard layer - human-readable metadata (EXIF/PNG tEXt)
-			billboard: billboard?.found ? {
-				found: true,
-				source: billboard.source,
-				software: billboard.software,
-				copyright: billboard.copyright,
-				description: billboard.description,
-				creator: billboard.creator,
-				timestamp: billboard.timestamp,
-				generationMethod: billboard.generationMethod,
-				generator: billboard.generator,
-				model: billboard.model,
-			} : { found: false },
+			billboard: billboard?.found
+				? {
+						found: true,
+						source: billboard.source,
+						software: billboard.software,
+						copyright: billboard.copyright,
+						description: billboard.description,
+						creator: billboard.creator,
+						timestamp: billboard.timestamp,
+						generationMethod: billboard.generationMethod,
+						generator: billboard.generator,
+						model: billboard.model,
+					}
+				: { found: false },
 			dimensions: { width, height },
 			// All signature layers status
 			layers: {

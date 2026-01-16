@@ -1,24 +1,24 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    // Include DOM for console, ES2022 for modern features
-    "lib": ["ES2022", "DOM"],
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "resolveJsonModule": true,
-    // Explicitly enable node types for node: protocol imports
-    "types": ["node"]
-  },
-  "include": ["src/**/*"],
-  // Exclude test files from distribution build but allow them to be type-checked
-  "exclude": ["node_modules", "dist"]
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		// Include DOM for console, ES2022 for modern features
+		"lib": ["ES2022", "DOM"],
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"resolveJsonModule": true,
+		// Explicitly enable node types for node: protocol imports
+		"types": ["node"]
+	},
+	"include": ["src/**/*"],
+	// Exclude test files from distribution build but allow them to be type-checked
+	"exclude": ["node_modules", "dist"]
 }

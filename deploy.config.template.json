@@ -1,30 +1,27 @@
 {
-  "$schema": "./deploy.config.schema.json",
-  "_comment": "COPY THIS TO deploy.config.json AND FILL IN YOUR VALUES",
-  
-  "gcloud": {
-    "configuration": "YOUR_GCLOUD_CONFIG_NAME",
-    "account": "YOUR_EMAIL@example.com",
-    "project": "YOUR_GCP_PROJECT_ID"
-  },
-  
-  "service": {
-    "name": "elara-sign",
-    "region": "us-central1",
-    "domain": "sign.yourdomain.com"
-  },
-  
-  "identity": {
-    "_comment": "Service identity for witness model - appears on signed documents",
-    "organizationName": "Your Organization Name",
-    "serviceEmail": "signing-service@yourdomain.com"
-  },
-  
-  "banned": {
-    "_comment": "Patterns that will BLOCK deployment if found in gcloud config",
-    "patterns": [
-      "client-project-name",
-      "client@email.com"
-    ]
-  }
+	"$schema": "./deploy.config.schema.json",
+	"_comment": "COPY THIS TO deploy.config.json AND FILL IN YOUR VALUES",
+
+	"gcloud": {
+		"configuration": "YOUR_GCLOUD_CONFIG_NAME",
+		"account": "YOUR_EMAIL@example.com",
+		"project": "YOUR_GCP_PROJECT_ID"
+	},
+
+	"service": {
+		"name": "elara-sign",
+		"region": "us-central1",
+		"domain": "sign.yourdomain.com"
+	},
+
+	"identity": {
+		"_comment": "Service identity for witness model - appears on signed documents",
+		"organizationName": "Your Organization Name",
+		"serviceEmail": "signing-service@yourdomain.com"
+	},
+
+	"banned": {
+		"_comment": "Patterns that will BLOCK deployment if found in gcloud config",
+		"patterns": ["client-project-name", "client@email.com"]
+	}
 }

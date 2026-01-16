@@ -430,25 +430,73 @@
     }
 
     /* ============================================
-       STATUS BADGES
+       MODALS
     ============================================ */
-    .status-badge {
-      display: inline-block;
-      padding: 6px 16px;
-      border-radius: 20px;
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .modal-content {
+      background: #1a1a2e;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      max-width: 400px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 24px 16px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      color: #ffffff;
+    }
+
+    .modal-close {
+      font-size: 24px;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .modal-close:hover {
+      color: #ffffff;
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .modal-footer-text {
+      text-align: center;
+      margin-top: 16px;
       font-size: 14px;
-      font-weight: 600;
+      color: rgba(255, 255, 255, 0.6);
     }
 
-    .status-badge.signed { 
-      background: linear-gradient(135deg, #00d4aa 0%, #00b894 100%);
-      color: #000; 
+    .modal-footer-text a {
+      color: #00d4ff;
+      text-decoration: none;
     }
 
-    .status-badge.unsigned { 
-      background: rgba(239, 68, 68, 0.2);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      color: #fca5a5; 
+    .modal-footer-text a:hover {
+      text-decoration: underline;
     }
 
     .status-badge.tampered { 
@@ -918,9 +966,21 @@
             <option value="mixed">🔀 AI-Assisted</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Generator / Tool</label>
+        <div class="form-group" id="image-generator-group">
+          <label id="image-generator-label">Generator / Tool</label>
           <input type="text" id="image-generator" placeholder="e.g., Midjourney, Photoshop">
+        </div>
+      </div>
+
+      <!-- Human creator fields (hidden by default) -->
+      <div class="form-row" id="image-human-fields" style="display: none;">
+        <div class="form-group">
+          <label>Creator Name</label>
+          <input type="text" id="image-creator-name" placeholder="Your full name">
+        </div>
+        <div class="form-group">
+          <label>Creator Email</label>
+          <input type="email" id="image-creator-email" placeholder="your.email@example.com">
         </div>
       </div>
 
@@ -959,15 +1019,27 @@
       <div class="form-row">
         <div class="form-group">
           <label>Generation Method</label>
-          <select id="video-method">
+          <select id="video-method" onchange="updateVideoFields()">
             <option value="ai">🤖 AI Generated</option>
             <option value="human">🎨 Human Created</option>
             <option value="mixed">🔀 AI-Assisted</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Generator / Tool</label>
+        <div class="form-group" id="video-generator-group">
+          <label id="video-generator-label">Generator / Tool</label>
           <input type="text" id="video-generator" placeholder="e.g., Sora, Runway, Premiere">
+        </div>
+      </div>
+
+      <!-- Human creator fields (hidden by default) -->
+      <div class="form-row" id="video-human-fields" style="display: none;">
+        <div class="form-group">
+          <label>Creator Name</label>
+          <input type="text" id="video-creator-name" placeholder="Your full name">
+        </div>
+        <div class="form-group">
+          <label>Creator Email</label>
+          <input type="email" id="video-creator-email" placeholder="your.email@example.com">
         </div>
       </div>
 
@@ -995,15 +1067,27 @@
       <div class="form-row">
         <div class="form-group">
           <label>Generation Method</label>
-          <select id="audio-method">
+          <select id="audio-method" onchange="updateAudioFields()">
             <option value="ai">🤖 AI Generated (TTS/Music)</option>
             <option value="human">🎨 Human Recording</option>
             <option value="mixed">🔀 AI-Assisted</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Generator / Tool</label>
+        <div class="form-group" id="audio-generator-group">
+          <label id="audio-generator-label">Generator / Tool</label>
           <input type="text" id="audio-generator" placeholder="e.g., ElevenLabs, Audacity">
+        </div>
+      </div>
+
+      <!-- Human creator fields (hidden by default) -->
+      <div class="form-row" id="audio-human-fields" style="display: none;">
+        <div class="form-group">
+          <label>Creator Name</label>
+          <input type="text" id="audio-creator-name" placeholder="Your full name">
+        </div>
+        <div class="form-group">
+          <label>Creator Email</label>
+          <input type="email" id="audio-creator-email" placeholder="your.email@example.com">
         </div>
       </div>
 
@@ -1031,15 +1115,27 @@
       <div class="form-row">
         <div class="form-group">
           <label>Generation Method</label>
-          <select id="document-method">
+          <select id="document-method" onchange="updateDocumentFields()">
             <option value="ai">🤖 AI Generated</option>
             <option value="human">🎨 Human Created</option>
             <option value="mixed">🔀 AI-Assisted</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Generator / Tool</label>
+        <div class="form-group" id="document-generator-group">
+          <label id="document-generator-label">Generator / Tool</label>
           <input type="text" id="document-generator" placeholder="e.g., ChatGPT, Word">
+        </div>
+      </div>
+
+      <!-- Human creator fields (hidden by default) -->
+      <div class="form-row" id="document-human-fields" style="display: none;">
+        <div class="form-group">
+          <label>Creator Name</label>
+          <input type="text" id="document-creator-name" placeholder="Your full name">
+        </div>
+        <div class="form-group">
+          <label>Creator Email</label>
+          <input type="email" id="document-creator-email" placeholder="your.email@example.com">
         </div>
       </div>
 
@@ -1175,8 +1271,16 @@
 
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('generator', document.getElementById(`${type}-generator`).value || 'elaraSign.web');
-      formData.append('method', document.getElementById(`${type}-method`).value);
+      const method = document.getElementById(`${type}-method`).value;
+      formData.append('method', method);
+      
+      if (method === 'human') {
+        const creatorName = document.getElementById(`${type}-creator-name`)?.value || '';
+        const creatorEmail = document.getElementById(`${type}-creator-email`)?.value || '';
+        formData.append('generator', `Human: ${creatorName} <${creatorEmail}>`);
+      } else {
+        formData.append('generator', document.getElementById(`${type}-generator`).value || 'elaraSign.web');
+      }
       
       if (type === 'image') {
         formData.append('model', document.getElementById('image-model')?.value || '');
@@ -1207,10 +1311,20 @@
       btn.textContent = `Sign ${type.charAt(0).toUpperCase() + type.slice(1)}`;
     }
 
-    function updateImageFields() {
-      const method = document.getElementById('image-method').value;
-      const aiFields = document.getElementById('image-ai-fields');
-      aiFields.style.display = (method === 'ai' || method === 'mixed') ? 'grid' : 'none';
+    function updateDocumentFields() {
+      const method = document.getElementById('document-method').value;
+      const humanFields = document.getElementById('document-human-fields');
+      const generatorGroup = document.getElementById('document-generator-group');
+      const generatorLabel = document.getElementById('document-generator-label');
+
+      if (method === 'human') {
+        humanFields.style.display = 'grid';
+        generatorGroup.style.display = 'none';
+      } else {
+        humanFields.style.display = 'none';
+        generatorGroup.style.display = 'block';
+        generatorLabel.textContent = method === 'ai' ? 'Generator / Tool' : 'Primary Tool';
+      }
     }
 
     async function fetchBuildId() {
@@ -1276,6 +1390,9 @@
     window.handleFileSelect = handleFileSelect;
     window.signContent = signContent;
     window.updateImageFields = updateImageFields;
+    window.updateVideoFields = updateVideoFields;
+    window.updateAudioFields = updateAudioFields;
+    window.updateDocumentFields = updateDocumentFields;
     window.verifyFile = verifyFile;
   </script>
 </body>

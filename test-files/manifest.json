@@ -1,84 +1,84 @@
 {
-  "version": "1.0.0",
-  "description": "Standard unsigned test files for elaraSign validation",
-  "created": "2026-01-11",
-  "files": {
-    "images": {
-      "sample-ai-generated.png": {
-        "description": "AI-generated image (Gemini)",
-        "format": "PNG",
-        "purpose": "Gold standard - tests all 4 signature layers",
-        "sizeKB": 1351
-      },
-      "sample-ai-generated.jpg": {
-        "description": "Same image converted to JPEG",
-        "format": "JPEG",
-        "purpose": "Tests EXIF injection and lossy format handling",
-        "sizeKB": 134
-      },
-      "sample-ai-generated.webp": {
-        "description": "Same image converted to WebP",
-        "format": "WebP",
-        "purpose": "Tests lossless WebP preservation",
-        "sizeKB": 1013
-      },
-      "sample-avatar.png": {
-        "description": "D-ID generated avatar image",
-        "format": "PNG",
-        "purpose": "Secondary PNG test with different content",
-        "sizeKB": 1246
-      },
-      "sample-small.png": {
-        "description": "Smaller PNG image",
-        "format": "PNG",
-        "purpose": "Tests minimum size handling",
-        "sizeKB": 109
-      }
-    },
-    "documents": {
-      "sample-document.pdf": {
-        "description": "Simple test PDF document",
-        "format": "PDF",
-        "purpose": "Tests PDF comment and /Info dictionary signing",
-        "sizeKB": 1
-      }
-    },
-    "audio": {
-      "sample-audio.wav": {
-        "description": "440Hz test tone (A4 note), 2 seconds",
-        "format": "WAV",
-        "purpose": "Tests WAV INFO chunk signing",
-        "sizeKB": 172,
-        "sampleRate": 44100,
-        "duration": 2
-      }
-    },
-    "video": {
-      "sample-video-short.mp4": {
-        "description": "Short video clip",
-        "format": "MP4",
-        "purpose": "Tests sidecar manifest generation",
-        "sizeKB": 2680
-      },
-      "sample-video-long.mp4": {
-        "description": "Longer video clip",
-        "format": "MP4",
-        "purpose": "Tests larger file handling",
-        "sizeKB": 5434
-      }
-    }
-  },
-  "testCoverage": {
-    "PNG": ["4-layer signing", "conversion survival"],
-    "JPEG": ["EXIF injection", "lossy warning"],
-    "WebP": ["lossless preservation"],
-    "PDF": ["comment block", "/Info dictionary"],
-    "WAV": ["INFO chunk metadata"],
-    "MP4": ["sidecar manifest"]
-  },
-  "usage": {
-    "elaraSign": "Copy to test-files/ directory",
-    "openElara": "Copy to test-assets/ directory",
-    "openElaraCloud": "Upload via test UI"
-  }
+	"version": "1.0.0",
+	"description": "Standard unsigned test files for elaraSign validation",
+	"created": "2026-01-11",
+	"files": {
+		"images": {
+			"sample-ai-generated.png": {
+				"description": "AI-generated image (Gemini)",
+				"format": "PNG",
+				"purpose": "Gold standard - tests all 4 signature layers",
+				"sizeKB": 1351
+			},
+			"sample-ai-generated.jpg": {
+				"description": "Same image converted to JPEG",
+				"format": "JPEG",
+				"purpose": "Tests EXIF injection and lossy format handling",
+				"sizeKB": 134
+			},
+			"sample-ai-generated.webp": {
+				"description": "Same image converted to WebP",
+				"format": "WebP",
+				"purpose": "Tests lossless WebP preservation",
+				"sizeKB": 1013
+			},
+			"sample-avatar.png": {
+				"description": "D-ID generated avatar image",
+				"format": "PNG",
+				"purpose": "Secondary PNG test with different content",
+				"sizeKB": 1246
+			},
+			"sample-small.png": {
+				"description": "Smaller PNG image",
+				"format": "PNG",
+				"purpose": "Tests minimum size handling",
+				"sizeKB": 109
+			}
+		},
+		"documents": {
+			"sample-document.pdf": {
+				"description": "Simple test PDF document",
+				"format": "PDF",
+				"purpose": "Tests PDF comment and /Info dictionary signing",
+				"sizeKB": 1
+			}
+		},
+		"audio": {
+			"sample-audio.wav": {
+				"description": "440Hz test tone (A4 note), 2 seconds",
+				"format": "WAV",
+				"purpose": "Tests WAV INFO chunk signing",
+				"sizeKB": 172,
+				"sampleRate": 44100,
+				"duration": 2
+			}
+		},
+		"video": {
+			"sample-video-short.mp4": {
+				"description": "Short video clip",
+				"format": "MP4",
+				"purpose": "Tests sidecar manifest generation",
+				"sizeKB": 2680
+			},
+			"sample-video-long.mp4": {
+				"description": "Longer video clip",
+				"format": "MP4",
+				"purpose": "Tests larger file handling",
+				"sizeKB": 5434
+			}
+		}
+	},
+	"testCoverage": {
+		"PNG": ["4-layer signing", "conversion survival"],
+		"JPEG": ["EXIF injection", "lossy warning"],
+		"WebP": ["lossless preservation"],
+		"PDF": ["comment block", "/Info dictionary"],
+		"WAV": ["INFO chunk metadata"],
+		"MP4": ["sidecar manifest"]
+	},
+	"usage": {
+		"elaraSign": "Copy to test-files/ directory",
+		"openElara": "Copy to test-assets/ directory",
+		"openElaraCloud": "Upload via test UI"
+	}
 }

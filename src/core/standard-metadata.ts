@@ -169,7 +169,7 @@ export function extractJpegElaraMetadata(jpegBuffer: Buffer): BillboardMetadata 
 		}
 
 		const zeroth = exif["0th"] as Record<number, string> | undefined;
-		const exifData = exif["Exif"] as Record<number, string> | undefined;
+		const exifData = exif.Exif as Record<number, string> | undefined;
 
 		// Try to extract our fields
 		const software = zeroth?.[piexif.ImageIFD.Software];
@@ -180,9 +180,8 @@ export function extractJpegElaraMetadata(jpegBuffer: Buffer): BillboardMetadata 
 		const dateOriginal = exifData?.[piexif.ExifIFD.DateTimeOriginal];
 
 		// Check if this is elaraSign metadata
-		const isElaraSign = software?.includes("elaraSign") || 
-		                    copyright?.includes("elaraSign") ||
-		                    userComment?.includes("elaraSign:");
+		const isElaraSign =
+			software?.includes("elaraSign") || copyright?.includes("elaraSign") || userComment?.includes("elaraSign:");
 
 		if (!isElaraSign) {
 			return null;
@@ -225,12 +224,10 @@ export function extractJpegElaraMetadata(jpegBuffer: Buffer): BillboardMetadata 
  * Extract elaraSign billboard metadata from PNG tEXt chunks
  * Sharp exposes these in metadata() under various fields
  */
-export function extractPngElaraMetadata(
-	pngMetadata: { 
-		comments?: Array<{ keyword: string; text: string }>;
-		[key: string]: unknown;
-	}
-): BillboardMetadata | null {
+export function extractPngElaraMetadata(pngMetadata: {
+	comments?: Array<{ keyword: string; text: string }>;
+	[key: string]: unknown;
+}): BillboardMetadata | null {
 	try {
 		// Sharp returns PNG text chunks in the 'comments' array
 		const comments = pngMetadata.comments;
@@ -247,10 +244,11 @@ export function extractPngElaraMetadata(
 		}
 
 		// Check if this is elaraSign metadata
-		const isElaraSign = chunks["Software"]?.includes("elaraSign") ||
-		                    chunks["Copyright"]?.includes("elaraSign") ||
-		                    chunks["Comment"]?.includes("elaraSign") ||
-		                    chunks["Source"]?.includes("openelara");
+		const isElaraSign =
+			chunks.Software?.includes("elaraSign") ||
+			chunks.Copyright?.includes("elaraSign") ||
+			chunks.Comment?.includes("elaraSign") ||
+			chunks.Source?.includes("openelara");
 
 		if (!isElaraSign) {
 			return null;
@@ -262,9 +260,9 @@ export function extractPngElaraMetadata(
 		let generator: string | undefined;
 		let model: string | undefined;
 
-		if (chunks["Comment"]) {
+		if (chunks.Comment) {
 			try {
-				const commentData = JSON.parse(chunks["Comment"]);
+				const commentData = JSON.parse(chunks.Comment);
 				if (commentData.elaraSign) {
 					metaHash = commentData.elaraSign.metaHash;
 					generationMethod = commentData.elaraSign.generationMethod || "unknown";
@@ -278,7 +276,7 @@ export function extractPngElaraMetadata(
 
 		// Fallback: parse from description text
 		if (!generationMethod || generationMethod === "unknown") {
-			const desc = chunks["Description"]?.toLowerCase() || "";
+			const desc = chunks.Description?.toLowerCase() || "";
 			if (desc.includes("ai-generated")) {
 				generationMethod = "ai";
 			} else if (desc.includes("human-created")) {
@@ -291,10 +289,10 @@ export function extractPngElaraMetadata(
 		return {
 			found: true,
 			source: "png-text",
-			software: chunks["Software"],
-			copyright: chunks["Copyright"],
-			description: chunks["Description"],
-			creator: chunks["Author"],
+			software: chunks.Software,
+			copyright: chunks.Copyright,
+			description: chunks.Description,
+			creator: chunks.Author,
 			timestamp: chunks["Creation Time"],
 			metaHash,
 			generationMethod,

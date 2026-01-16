@@ -103,7 +103,7 @@ ABOUT ELARASIGN:
 elaraSign is a sovereign, open-source content provenance system.
 It's experimental software - use at your own discretion.
 
-Source code: https://github.com/openelara/elara-sign
+Source code: https://github.com/applymytech/elaraSign
 "Transparency is not optional"
 
 Learn more: https://sign.openelara.org

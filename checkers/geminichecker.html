@@ -32,7 +32,7 @@
             e.preventDefault();
             dropZone.classList.remove('hover');
             const file = e.dataTransfer.files[0];
-            if (file) processImage(file);
+            if (file) { processImage(file); }
         });
 
         function processImage(file) {
@@ -57,7 +57,7 @@
                 
                 // Extract Steganography (Blue Channel LSBs)
                 // Logic based on signing-core.ts: embedAtLocation
-                let extractedBytes = [];
+                const extractedBytes = [];
                 let currentByte = 0;
                 let nibbleIndex = 0;
 
