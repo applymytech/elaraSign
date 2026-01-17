@@ -1,11 +1,11 @@
 {
-	"$schema": "./deploy.config.schema.json",
 	"_comment": "COPY THIS TO deploy.config.json AND FILL IN YOUR VALUES",
 
 	"gcloud": {
 		"configuration": "YOUR_GCLOUD_CONFIG_NAME",
 		"account": "YOUR_EMAIL@example.com",
-		"project": "YOUR_GCP_PROJECT_ID"
+		"project": "YOUR_GCP_PROJECT_ID",
+		"serviceAccount": "YOUR_SERVICE_ACCOUNT@YOUR_PROJECT.iam.gserviceaccount.com"
 	},
 
 	"service": {
@@ -17,7 +17,8 @@
 	"identity": {
 		"_comment": "Service identity for witness model - appears on signed documents",
 		"organizationName": "Your Organization Name",
-		"serviceEmail": "signing-service@yourdomain.com"
+		"serviceEmail": "signing-service@yourdomain.com",
+		"adminEmail": "your-personal@email.com"
 	},
 
 	"banned": {

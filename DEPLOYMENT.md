@@ -1,279 +1,217 @@
-# elaraSign Deployment Guide
+# elaraSign Deployment
 
-## Configuration Pattern
+**ONE script handles everything.**
 
-**All deployment scripts are DYNAMIC - no hardcoded values.**
+## Quick Start
 
-```
-deploy.config.json          ← Your actual values (GITIGNORED - stays local)
-deploy.config.template.json ← Template for new users (IN REPO)
-```
-
-### First-Time Setup
-
-1. Copy the template:
-   ```powershell
-   Copy-Item deploy.config.template.json deploy.config.json
-   ```
-
-2. Edit `deploy.config.json` with your values:
-   ```json
-   {
-     "gcloud": {
-       "configuration": "elarasign",
-       "account": "your-email@example.com",
-       "project": "your-gcp-project-id",
-       "region": "us-central1"
-     },
-     "service": {
-       "name": "elara-sign",
-       "domain": "sign.yourdomain.com"
-     },
-     "banned": {
-       "patterns": ["client-project", "wrong-account@email.com"]
-     }
-   }
-   ```
-
-3. Run preflight to verify:
-   ```powershell
-   .\preflight.ps1
-   ```
-
----
-
-## Full Deployment Workflow
-
-### The Professional Pattern
-
-```
-.\deploy-checklist.ps1  Human decisions (version, docs, accountability)
-        │
-        ▼
-.\preflight.ps1         Environment validation
-        │
-        ▼
-.\deploy-preview.ps1    Deploy WITHOUT traffic (safe testing)
-        │
-        ▼
-   Test preview URL
-        │
-        ▼
-.\deploy-promote.ps1    Shift 100% traffic to preview
-        │
-        ▼
-   If issues discovered:
-.\deploy-rollback.ps1   Emergency revert to previous
+```bash
+./setup.sh      # Set up project, APIs, secrets, permissions
+./preflight.sh  # Verify everything is ready
+./deploy.sh     # Deploy preview (0% traffic)
+./promote.sh    # Go live
 ```
 
-### Step 1: Pre-Deploy Checklist
-
-```powershell
-.\deploy-checklist.ps1
-```
-
-This prompts for:
-- **Version bump**: Patch (+0.0.1), Minor (+0.1.0), or Major (+1.0.0)
-- **Documentation check**: Is it current or stale?
-- **Change summary**: What was done (accountability)
-- **Completeness**: Complete, Framework/Stubs, or WIP
-
-All decisions are logged to `devdocs/deploy-logs/`.
-
-### Step 2: Preflight
-
-```powershell
-.\preflight.ps1
-```
-
-Validates environment is ready (gcloud, lint, build).
-
-### Step 3: Deploy Preview
-
-```powershell
-.\deploy-preview.ps1
-```
-
-Deploys without routing traffic. Test the preview URL.
-
-### Step 4: Promote or Rollback
-
-```powershell
-.\deploy-promote.ps1      # Go live
-.\deploy-rollback.ps1     # If issues
-```
-
-### Commands
-
-| Command | Purpose |
-|---------|---------|
-| `.\preflight.ps1` | Verify environment is ready |
-| `.\deploy-preview.ps1` | Deploy new version WITHOUT traffic |
-| `.\deploy-promote.ps1` | Shift traffic to preview (go live) |
-| `.\deploy-promote.ps1 -Gradual` | Gradual rollout: 10% → 50% → 100% |
-| `.\deploy-rollback.ps1` | Emergency revert to previous version |
-| `.\deploy-rollback.ps1 -List` | Show available revisions |
-| `.\deploy-status.ps1` | Show current deployment state |
-
-### Example: Safe Deployment
-
-```powershell
-# 1. Verify everything is ready
-.\preflight.ps1
-
-# 2. Deploy preview (no traffic)
-.\deploy-preview.ps1
-# Output: Preview URL: https://elara-sign-abc123-uc.a.run.app
-
-# 3. Test the preview URL manually
-# - Check health endpoint
-# - Test signing/verification
-# - Verify UI works
-
-# 4. If good, go live
-.\deploy-promote.ps1
-# Type: PROMOTE
-
-# 5. If issues after promotion
-.\deploy-rollback.ps1
-# Type: ROLLBACK
+If something breaks:
+```bash
+./rollback.sh   # Revert to previous version
 ```
 
 ---
 
-## Enforcement Hierarchy
+## What setup.sh Does (Automatic)
+
+1. ✅ Checks Node.js 24+
+2. ✅ Checks gcloud SDK  
+3. ✅ Authenticates you (`gcloud auth login` if needed)
+4. ✅ Installs npm dependencies
+5. ✅ **Creates deploy.config.json interactively**
+6. ✅ Verifies GCP project access
+7. ✅ **Enables required APIs** (Cloud Build, Cloud Run, Artifact Registry, Secret Manager)
+8. ✅ **Creates Artifact Registry repository**
+9. ✅ **Generates forensic master key** (64 bytes, cryptographically secure)
+10. ✅ **Generates P12 signing certificate** (OpenSSL, 10-year validity)
+11. ✅ **Uploads secrets to Secret Manager**
+12. ✅ **Configures service account permissions**
+
+After setup.sh completes, you're ready to deploy.
+
+---
+
+## Configuration (deploy.config.json)
+
+Setup.sh creates this interactively. Example:
+
+```json
+{
+  "gcloud": {
+    "account": "you@example.com",
+    "project": "your-project-id",
+    "region": "us-central1"
+  },
+  "service": {
+    "name": "elara-sign",
+    "domain": ""  // Optional - leave empty to use Cloud Run URL
+  },
+  "identity": {
+    "organizationName": "Your Organization",
+    "serviceEmail": "signing@example.com"
+  }
+}
+```
+
+**Custom domain is optional.** If you don't have one, leave it empty and Cloud Run will give you a URL.
+
+---
+
+## The Scripts
+
+| Script | What It Does | When To Run |
+|--------|--------------|-------------|
+| `setup.sh` | Complete first-time setup | Once per project |
+| `preflight.sh` | Verify everything ready | Before each deploy |
+| `deploy.sh` | Deploy with 0% traffic | Deploy new version |
+| `promote.sh` | Route 100% traffic to new version | After testing preview |
+| `rollback.sh` | Revert to previous version | If promoted version has issues |
+
+### Deploy Workflow
 
 ```
-HEAVEN (architecture-review/elara-engineer)
-│   Strict universal rules + runs actual linters
-│   May flag things this app legitimately ignores
-│   Use: npx tsx elara-engineer/compliance-enforcer.ts --app=elaraSign
-│
-▼
-APP PREFLIGHT (.\preflight.ps1)
-│   App-specific rules with legitimate ignores
-│   Uses this app's biome.json
-│   THIS GATES DEPLOYMENT (must pass)
-│
-▼
-DEPLOY
+setup.sh        # First time only
+    ↓
+preflight.sh    # Every time before deploy
+    ↓
+deploy.sh       # Get preview URL
+    ↓
+Test preview    # Make sure it works
+    ↓
+promote.sh      # Go live
 ```
 
-**VS Code Problems panel is NOT the truth source.** Running actual linters is.
+### If Something Breaks
+
+```
+rollback.sh     # Instantly revert to previous version
+```
 
 ---
 
-## What Preflight Checks
+## Requirements
 
-| Check | What It Verifies |
-|-------|------------------|
-| [1] gcloud CLI | gcloud command available |
-| [2] Configuration | Named config exists (from deploy.config.json) |
-| [3] Authentication | Account is logged in |
-| [4] Project Access | Can access the GCP project |
-| [5] Node.js | Node.js installed |
-| [6] Dependencies | node_modules exists |
-| [7] Biome Lint | **0 errors AND 0 warnings** |
-| [8] TypeScript | Code compiles successfully |
+- **Node.js 24+** ([nodejs.org](https://nodejs.org) or `choco install nodejs-lts`)
+- **Google Cloud SDK** ([cloud.google.com/sdk](https://cloud.google.com/sdk) or `choco install gcloudsdk`)
+- **OpenSSL** (for certificate generation - included with Git on Windows)
+- **Google Cloud Project** (free tier works, ~$5/month under load)
 
----
+### Windows Users
 
-## Files Overview
+All scripts work in Git Bash. Use Chocolatey for dependencies:
 
-| File | Purpose | In Git? |
-|------|---------|---------|
-| `deploy.config.json` | Your deployment config | **No** (gitignored) |
-| `deploy.config.template.json` | Template for new users | Yes |
-| `preflight.ps1` | Pre-deploy validation | Yes |
-| `deploy.ps1` | Direct deploy (legacy) | Yes |
-| `deploy-preview.ps1` | Deploy without traffic | Yes |
-| `deploy-promote.ps1` | Shift traffic to preview | Yes |
-| `deploy-rollback.ps1` | Emergency revert | Yes |
-| `deploy-status.ps1` | Show current state | Yes |
-| `.preview-revision` | Tracks pending preview | **No** (gitignored) |
-| `.last-live-revision` | Tracks rollback target | **No** (gitignored) |
+```powershell
+choco install nodejs-lts gcloudsdk
+```
 
 ---
 
-## GCP Prerequisites
+## Secrets & Keys
 
-Before first deployment, ensure:
+### What Gets Generated
 
-1. **GCP Project exists**
-2. **Billing enabled**
-3. **APIs enabled:**
-   ```powershell
-   gcloud services enable cloudbuild.googleapis.com artifactregistry.googleapis.com run.googleapis.com
-   ```
-4. **Artifact Registry repo created:**
-   ```powershell
-   gcloud artifacts repositories create elara-sign-repo --repository-format=docker --location=us-central1
-   ```
-5. **Cloud Build has deployment permissions:**
-   ```powershell
-   PROJECT_NUMBER=$(gcloud projects describe YOUR_PROJECT --format='value(projectNumber)')
-   gcloud projects add-iam-policy-binding YOUR_PROJECT \
-     --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
-     --role="roles/run.admin"
-   gcloud projects add-iam-policy-binding YOUR_PROJECT \
-     --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
-     --role="roles/iam.serviceAccountUser"
-   ```
+| Secret | How | Where |
+|--------|-----|-------|
+| **Forensic Master Key** | 64 random bytes | Secret Manager |
+| **P12 Certificate** | OpenSSL self-signed | Secret Manager + local certs/ |
+| **P12 Password** | 64 random hex chars | Secret Manager + local certs/ |
+
+### Security
+
+- Secrets stored in **Google Secret Manager** (encrypted at rest)
+- Service account gets read-only access to secrets
+- Local copies in `certs/` directory (gitignored)
+- **Never commit secrets** - setup.sh generates fresh ones for each deployment
 
 ---
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| "deploy.config.json not found" | Copy template: `Copy-Item deploy.config.template.json deploy.config.json` |
-| "Account not authenticated" | Run: `gcloud auth login` |
-| "Cannot access project" | Check project ID in config, verify billing enabled |
-| "Biome found warnings" | Run: `npm run lint:fix` then retry |
-| "TypeScript build failed" | Run: `npm run build` locally to see errors |
-| "No preview revision found" | Run `deploy-preview.ps1` before `deploy-promote.ps1` |
+### "gcloud not found"
+
+**Windows:** Use Git Bash (not PowerShell). Or install gcloud:
+```powershell
+choco install gcloudsdk
+```
+
+**Linux/Mac:** Install from [cloud.google.com/sdk](https://cloud.google.com/sdk)
+
+### "Permission denied"
+
+Run `gcloud auth login` and make sure you have Editor or Owner role on the GCP project.
+
+### "API not enabled"
+
+Run setup.sh again - it will enable missing APIs automatically.
+
+### "Secrets already exist"
+
+That's fine! setup.sh detects existing secrets and skips regeneration. Your keys persist across deployments.
 
 ---
 
-## Project Isolation
+## Cost Estimate
 
-**NEVER deploy to wrong projects.** The `banned.patterns` in config blocks deployment if detected:
+| Component | Free Tier | Typical Cost |
+|-----------|-----------|--------------|
+| Cloud Run | 2M requests/month | $0 - $5/month |
+| Artifact Registry | 0.5 GB free | ~$0.10/month |
+| Secret Manager | 6 secrets free | $0.06/month |
+| Cloud Build | 120 builds/day | Free |
+| **Total** | | **~$5/month max** |
 
-```json
-"banned": {
-  "patterns": ["wrong-project", "client@email.com"]
-}
-```
-
-This prevents accidental cross-contamination between projects.
+With light traffic, you'll stay in free tier. At scale (thousands of signs/day), costs remain minimal.
 
 ---
 
-## Developer Documentation
+## Custom Domain Setup
 
-### Working Docs (`devdocs/workingdocs/`)
+If you want `sign.yourdomain.com` instead of the Cloud Run URL:
 
-This folder is for **engineer experiments during development**:
-- Test scripts
-- Debug utilities  
-- Temporary investigation code
-- Proof-of-concept files
+1. **During setup.sh**: Enter your domain when prompted
+2. **After deployment**: 
+   - Get the Cloud Run URL from deploy.sh output
+   - Add a CNAME record: `sign → your-service.run.app`
+   - Map domain in Cloud Run console
 
-**This folder is gitignored** (except README.md). Use it freely without cluttering git history.
+**Don't have a domain?** Leave it blank during setup - Cloud Run URL works fine.
 
-### Deploy Logs (`devdocs/deploy-logs/`)
+---
 
-Created automatically by `deploy-checklist.ps1`. Each deployment creates a timestamped log:
+## Architecture
 
 ```
-deploy-2025-06-18-103045.log
+GitHub → Cloud Build → Artifact Registry → Cloud Run
+                                              ↓
+                                    Secret Manager
+                                    (master key, P12 cert)
 ```
 
-Contains:
-- Version bump decision (patch/minor/major)
-- Documentation status (updated/stale)
-- Change summary (what was done)
-- Completeness status (complete/partial)
-- Timestamp and engineer notes
+- **No database** - Stateless signing service
+- **No authentication** - Public service (like HTTPS certificate issuers)
+- **Session storage** - Temporary files auto-delete after download/timeout
+- **Secrets** - Master key and certificates in Secret Manager
 
-**These logs are gitignored** but provide local accountability trail.
+---
+
+## Update Deployment
+
+To deploy a new version:
+
+```bash
+./preflight.sh   # Verify code
+./deploy.sh      # Deploy preview
+./promote.sh     # Go live
+```
+
+Previous version remains available for instant rollback.
+
+---
+
+## Support

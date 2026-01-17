@@ -16,7 +16,7 @@
  *                          Easy to strip but provides trust signal
  *
  * 2. DNA (Internal)       - LSB steganographic embedding
- *                          3 locations (top-left, top-right, bottom-center)
+ *                          5 locations (top-left, top-right, bottom-left, bottom-right, center)
  *                          Crop-resilient, survives lossless operations
  *                          Our sovereign proof
  *

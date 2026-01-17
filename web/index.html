@@ -773,6 +773,264 @@
     }
 
     /* ============================================
+       AUTH UI
+    ============================================ */
+    .auth-container {
+      position: absolute;
+      top: 85px;
+      right: 20px;
+      z-index: 100;
+    }
+
+    .auth-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(15, 20, 35, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 8px 16px;
+    }
+
+    .auth-user img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid #00d4aa;
+    }
+
+    .auth-user-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .auth-user-name {
+      font-size: 0.85rem;
+      color: #fff;
+      font-weight: 500;
+    }
+
+    .auth-user-type {
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .auth-user-type.admin {
+      color: #ffc107;
+    }
+
+    .auth-btn {
+      padding: 8px 20px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+    }
+
+    .auth-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .auth-btn.google {
+      background: rgba(66, 133, 244, 0.15);
+      border-color: rgba(66, 133, 244, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 24px;
+      font-size: 1rem;
+    }
+
+    .auth-btn.google:hover {
+      background: rgba(66, 133, 244, 0.25);
+    }
+
+    .auth-btn.signout {
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    .auth-btn.signout:hover {
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    /* Login Modal */
+    .login-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-modal.show {
+      display: flex;
+    }
+
+    .login-box {
+      background: rgba(15, 20, 35, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 24px;
+      padding: 40px;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .login-box h2 {
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #00d4ff 0%, #00d4aa 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .login-box .subtitle {
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 24px;
+      font-size: 0.9rem;
+    }
+
+    .login-divider {
+      display: flex;
+      align-items: center;
+      margin: 20px 0;
+      color: rgba(255, 255, 255, 0.3);
+      font-size: 0.8rem;
+    }
+
+    .login-divider::before,
+    .login-divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .login-divider::before { margin-right: 12px; }
+    .login-divider::after { margin-left: 12px; }
+
+    .login-public-option {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .login-public-option h4 {
+      color: #fff;
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+    }
+
+    .login-public-option p {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 0.8rem;
+      margin-bottom: 12px;
+    }
+
+    .login-warning {
+      background: rgba(255, 193, 7, 0.1);
+      border: 1px solid rgba(255, 193, 7, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.75rem;
+      color: rgba(255, 193, 7, 0.9);
+      margin-top: 16px;
+    }
+
+    .login-warning strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .login-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .login-close:hover {
+      color: #fff;
+    }
+
+    .admin-link {
+      color: rgba(255, 255, 255, 0.25);
+      font-size: 0.7rem;
+      text-decoration: none;
+      margin-top: 20px;
+      display: inline-block;
+    }
+
+    .admin-link:hover {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* Admin Login Form (hidden by default) */
+    .admin-login-form {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .admin-login-form.show {
+      display: block;
+    }
+
+    .admin-login-form input {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 1rem;
+      margin-bottom: 12px;
+    }
+
+    .admin-login-form input:focus {
+      outline: none;
+      border-color: #ffc107;
+    }
+
+    .admin-login-form button {
+      width: 100%;
+      padding: 12px;
+      background: rgba(255, 193, 7, 0.15);
+      border: 1px solid rgba(255, 193, 7, 0.3);
+      border-radius: 10px;
+      color: #ffc107;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .admin-login-form button:hover {
+      background: rgba(255, 193, 7, 0.25);
+    }
+
+    .admin-login-form .error {
+      color: #ef4444;
+      font-size: 0.8rem;
+      margin-top: 8px;
+    }
+
+    /* ============================================
        INFO BOX (Transparency Disclosure)
     ============================================ */
     .info-box {
@@ -796,6 +1054,93 @@
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+
+    /* ============================================
+       HOW IT WORKS SECTIONS
+    ============================================ */
+    .how-section {
+      background: rgba(15, 20, 35, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .how-section h3 {
+      color: #a855f7;
+      margin-bottom: 12px;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .how-section p {
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .how-section ul, .how-section ol {
+      color: rgba(255, 255, 255, 0.75);
+      margin: 12px 0;
+      padding-left: 20px;
+    }
+
+    .how-section li {
+      margin: 6px 0;
+      line-height: 1.4;
+    }
+
+    .how-section strong {
+      color: #00d4ff;
+    }
+
+    .location-diagram {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 12px 0;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+    }
+
+    .location {
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.8);
+      padding: 4px 8px;
+      background: rgba(168, 85, 247, 0.1);
+      border-radius: 6px;
+      border-left: 3px solid #a855f7;
+    }
+
+    /* ============================================
+       SIDECAR VALIDATION
+    ============================================ */
+    .sidecar-section {
+      margin: 20px 0;
+      padding: 16px;
+      background: rgba(15, 20, 35, 0.4);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .sidecar-section h4 {
+      color: #00d4ff;
+      margin-bottom: 12px;
+      font-size: 0.9rem;
+    }
+
+    .sidecar-drop {
+      border-color: rgba(0, 212, 255, 0.3);
+      background: rgba(0, 212, 255, 0.05);
+    }
+
+    .sidecar-drop:hover {
+      border-color: rgba(0, 212, 255, 0.5);
+      background: rgba(0, 212, 255, 0.08);
     }
 
     .info-box.warning h4 {
@@ -909,6 +1254,27 @@
   </div>
   <div class="demo-banner-spacer"></div>
 
+  <!-- Auth Container (top-right) -->
+  <div class="auth-container" id="auth-container">
+    <!-- Populated by JavaScript -->
+  </div>
+
+  <!-- Login Modal (Admin Only) -->
+  <div class="login-modal" id="login-modal">
+    <div class="login-box" style="position: relative;">
+      <button class="login-close" onclick="closeLoginModal()">&times;</button>
+      <h2>🔐 Admin Login</h2>
+      <p class="subtitle">Service operator authentication</p>
+      
+      <div style="margin-top: 20px;">
+        <input type="email" id="admin-email" placeholder="Admin email" autocomplete="email" style="width: 100%; padding: 12px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; color: #fff; font-size: 1rem; margin-bottom: 12px;">
+        <input type="password" id="admin-password" placeholder="Password" autocomplete="current-password" style="width: 100%; padding: 12px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; color: #fff; font-size: 1rem; margin-bottom: 12px;">
+        <button onclick="signInAdmin()" style="width: 100%; padding: 12px; background: rgba(255, 193, 7, 0.15); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 10px; color: #ffc107; font-size: 1rem; cursor: pointer;">Sign In</button>
+        <div class="error" id="admin-error" style="color: #ef4444; font-size: 0.8rem; margin-top: 8px;"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Background: Cover Image + Dark Overlay -->
   <div class="cover-bg"></div>
   <div class="cover-overlay"></div>
@@ -930,6 +1296,8 @@
     <div class="tabs">
       <button class="tab active" onclick="showMainTab('sign')">✍️ Sign</button>
       <button class="tab" onclick="showMainTab('verify')">🔍 Verify</button>
+      <button class="tab" onclick="showMainTab('about')">ℹ️ About</button>
+      <button class="tab" id="admin-tab" onclick="showMainTab('admin')" style="display: none;">⚡ Admin</button>
     </div>
 
     <!-- Sign Sub-Tabs (file type selector) -->
@@ -960,7 +1328,7 @@
       <div class="form-row">
         <div class="form-group">
           <label>Generation Method</label>
-          <select id="image-method" onchange="updateImageFields()">
+          <select id="image-method">
             <option value="ai">🤖 AI Generated</option>
             <option value="human">🎨 Human Created</option>
             <option value="mixed">🔀 AI-Assisted</option>
@@ -1019,7 +1387,7 @@
       <div class="form-row">
         <div class="form-group">
           <label>Generation Method</label>
-          <select id="video-method" onchange="updateVideoFields()">
+          <select id="video-method">
             <option value="ai">🤖 AI Generated</option>
             <option value="human">🎨 Human Created</option>
             <option value="mixed">🔀 AI-Assisted</option>
@@ -1067,7 +1435,7 @@
       <div class="form-row">
         <div class="form-group">
           <label>Generation Method</label>
-          <select id="audio-method" onchange="updateAudioFields()">
+          <select id="audio-method">
             <option value="ai">🤖 AI Generated (TTS/Music)</option>
             <option value="human">🎨 Human Recording</option>
             <option value="mixed">🔀 AI-Assisted</option>
@@ -1115,7 +1483,7 @@
       <div class="form-row">
         <div class="form-group">
           <label>Generation Method</label>
-          <select id="document-method" onchange="updateDocumentFields()">
+          <select id="document-method">
             <option value="ai">🤖 AI Generated</option>
             <option value="human">🎨 Human Created</option>
             <option value="mixed">🔀 AI-Assisted</option>
@@ -1147,21 +1515,143 @@
     <div id="verify-panel" class="panel">
       <div class="info-box">
         <h4>🔍 Verify Any File</h4>
-        <p>Check if a file has elaraSign provenance embedded.</p>
+        <p>Check if a file has elaraSign provenance embedded, or validate against a sidecar JSON.</p>
       </div>
 
+      <!-- Main file drop zone -->
       <div class="drop-zone" onclick="document.getElementById('verify-file').click()"
            ondragover="event.preventDefault(); this.classList.add('dragover')"
            ondragleave="this.classList.remove('dragover')"
            ondrop="handleDrop(event, 'verify')">
         <div class="icon">🔍</div>
         <p><strong>Drop file here</strong></p>
-        <p>Images or PDFs only</p>
+        <p>Images, PDFs, Audio, or Video files</p>
       </div>
-      <input type="file" id="verify-file" accept="image/*,application/pdf" onchange="handleFileSelect(this, 'verify')">
+      <input type="file" id="verify-file" accept="image/*,application/pdf,audio/*,video/*" onchange="handleFileSelect(this, 'verify')">
+
+      <!-- Sidecar validation section -->
+      <div class="sidecar-section">
+        <h4>📋 Optional: Validate Against Sidecar</h4>
+        <div class="drop-zone sidecar-drop" onclick="document.getElementById('verify-sidecar').click()"
+             ondragover="event.preventDefault(); this.classList.add('dragover')"
+             ondragleave="this.classList.remove('dragover')"
+             ondrop="handleDrop(event, 'verify-sidecar')">
+          <div class="icon">📄</div>
+          <p><strong>Drop sidecar JSON here</strong></p>
+          <p>Validates file against provenance data</p>
+        </div>
+        <input type="file" id="verify-sidecar" accept=".json,application/json" onchange="handleFileSelect(this, 'verify-sidecar')">
+      </div>
 
       <button class="primary" id="verify-btn" onclick="verifyFile()" disabled>Verify File</button>
       <div id="verify-result" class="result"></div>
+    </div>
+
+    <!-- ============ ABOUT PANEL ============ -->
+    <div id="how-panel" class="panel">
+      <div class="info-box">
+        <h4>ℹ️ About elaraSign</h4>
+        <p>Understanding the content hash system and multi-layer verification.</p>
+      </div>
+
+      <div class="how-section">
+        <h3>🔐 Content Hash System</h3>
+        <p>Every file gets a unique cryptographic fingerprint using SHA-256:</p>
+        <ul>
+          <li><strong>Content Hash:</strong> Full SHA-256 of the raw file bytes (no truncation)</li>
+          <li><strong>Metadata Hash:</strong> Full SHA-256 of the JSON metadata (no truncation)</li>
+          <li><strong>64-bit Timestamp:</strong> Millisecond precision, future-proof until year 292 billion</li>
+        </ul>
+        <p>This ensures <strong>tamper-proof provenance</strong> - any change to the file breaks the signature.</p>
+      </div>
+
+      <div class="how-section">
+        <h3>🎯 Multi-Location Redundancy (Images)</h3>
+        <p>Images embed signatures in <strong>5 locations</strong> for maximum crop resistance:</p>
+        <div class="location-diagram">
+          <div class="location">📍 Top-Left (48×4 pixels)</div>
+          <div class="location">📍 Top-Right (4×48 pixels)</div>
+          <div class="location">📍 Bottom-Left (48×4 pixels)</div>
+          <div class="location">📍 Bottom-Right (4×48 pixels)</div>
+          <div class="location">📍 Center (48×4 pixels) - hidden in plain sight</div>
+        </div>
+        <p>Even aggressive cropping leaves at least one signature intact!</p>
+      </div>
+
+      <div class="how-section">
+        <h3>📋 Sidecar Validation</h3>
+        <p>Upload a sidecar JSON file to verify any image matches its provenance:</p>
+        <ul>
+          <li>Checks content hash against the file</li>
+          <li>Validates metadata integrity</li>
+          <li>Confirms generation method and timestamp</li>
+        </ul>
+        <p>Perfect for verifying downloaded content or shared files.</p>
+      </div>
+
+      <div class="how-section">
+        <h3>📄 PDF Digital Signatures</h3>
+        <p>PDFs get industry-standard PKCS#7 signatures that Adobe recognizes:</p>
+        <ul>
+          <li><strong>Visible signatures</strong> in Adobe Reader</li>
+          <li><strong>Green checkmarks</strong> from online validators</li>
+          <li><strong>Legal validity</strong> for documents</li>
+        </ul>
+        <p>Combines elaraSign metadata with standard digital certificates.</p>
+      </div>
+
+      <div class="how-section">
+        <h3>🔍 Verification Layers</h3>
+        <p>Files are checked through multiple verification layers:</p>
+        <ol>
+          <li><strong>Billboard:</strong> Human-readable metadata (EXIF/PNG chunks)</li>
+          <li><strong>DNA:</strong> Hidden steganographic signatures (LSB pixels)</li>
+          <li><strong>The Spread:</strong> DCT watermark (survives JPEG compression)</li>
+        </ol>
+        <p>Each layer provides different resilience to processing and editing.</p>
+      </div>
+    </div>
+
+    <!-- ============ ADMIN PANEL ============ -->
+    <div id="admin-panel" class="panel">
+      <div class="info-box warning">
+        <h4>⚡ Admin Panel</h4>
+        <p>Forensic decryption for legal accountability. Master key required.</p>
+      </div>
+
+      <div class="how-section">
+        <h3>🔓 Forensic Decryption</h3>
+        <p>Upload a signed image to decrypt embedded accountability data:</p>
+        
+        <div class="drop-zone" onclick="document.getElementById('admin-decrypt-file').click()" 
+             ondragover="event.preventDefault(); this.classList.add('dragover')"
+             ondragleave="this.classList.remove('dragover')"
+             ondrop="handleDrop(event, 'admin-decrypt')">
+          <div class="icon">🔐</div>
+          <p><strong>Drop signed image here</strong></p>
+          <p>PNG, JPG, WebP, GIF, TIFF • Max 50MB</p>
+        </div>
+        <input type="file" id="admin-decrypt-file" accept="image/*" onchange="handleFileSelect(this, 'admin-decrypt')">
+
+        <button class="primary" id="decrypt-btn" onclick="decryptForensicData()" disabled>Decrypt Forensic Data</button>
+        <div id="decrypt-result" class="result"></div>
+      </div>
+
+      <div class="how-section">
+        <h3>📋 What Gets Decrypted</h3>
+        <ul>
+          <li><strong>Timestamp:</strong> Exact signing time (millisecond precision)</li>
+          <li><strong>User Fingerprint:</strong> SHA-256 hash prefix for user lookup</li>
+          <li><strong>IP Address:</strong> IPv4 address of the signer</li>
+          <li><strong>Platform:</strong> Which service generated the signature</li>
+        </ul>
+        <p>This data is encrypted with the master key and embedded in pixel data. Only the key holder can decrypt it.</p>
+      </div>
+
+      <div class="info-box warning">
+        <h4>⚠️ Legal Use Only</h4>
+        <p>Forensic decryption should only be used in response to valid legal requests from authorities. Misuse violates user privacy.</p>
+      </div>
     </div>
 
     <!-- Footer -->
@@ -1191,32 +1681,45 @@
 
       <div class="footer-license">
         <p><strong>License:</strong> MIT (Freeware/Shareware)</p>
-        <p>Commercial licensing inquiries: <a href="mailto:openelara@applymytech.ai">openelara@applymytech.ai</a></p>
+        <p>Commercial licensing inquiries: <a id="contact-email-link" href="mailto:openelara@applymytech.ai">openelara@applymytech.ai</a></p>
+        <p style="margin-top: 12px;"><a href="#" onclick="showLoginModal(); return false;" style="color: rgba(255,255,255,0.3); font-size: 0.7rem;">Operator access</a></p>
       </div>
     </footer>
   </div>
 
   <script>
     // File data storage by type
-    const fileData = { image: null, video: null, audio: null, document: null, verify: null };
+    const fileData = { image: null, video: null, audio: null, document: null, verify: null, 'verify-sidecar': null };
     let currentSignType = 'image';
 
-    // Show main tab (Sign vs Verify)
+    // Show main tab (Sign vs Verify vs About vs Admin)
     function showMainTab(tab) {
       document.querySelectorAll('.tabs .tab').forEach(t => { t.classList.remove('active'); });
       event.target.classList.add('active');
       
       const subtabs = document.getElementById('sign-subtabs');
       const verifyPanel = document.getElementById('verify-panel');
+      const aboutPanel = document.getElementById('how-panel');
+      const adminPanel = document.getElementById('admin-panel');
       
       if (tab === 'sign') {
         subtabs.classList.remove('hidden');
         verifyPanel.classList.remove('active');
+        aboutPanel.classList.remove('active');
+        if (adminPanel) { adminPanel.classList.remove('active'); }
         showSignType(currentSignType);
-      } else {
+      } else if (tab === 'verify') {
         subtabs.classList.add('hidden');
         document.querySelectorAll('.panel').forEach(p => { p.classList.remove('active'); });
         verifyPanel.classList.add('active');
+      } else if (tab === 'about') {
+        subtabs.classList.add('hidden');
+        document.querySelectorAll('.panel').forEach(p => { p.classList.remove('active'); });
+        aboutPanel.classList.add('active');
+      } else if (tab === 'admin' && adminPanel) {
+        subtabs.classList.add('hidden');
+        document.querySelectorAll('.panel').forEach(p => { p.classList.remove('active'); });
+        adminPanel.classList.add('active');
       }
     }
 
@@ -1234,10 +1737,15 @@
       document.getElementById(`sign-${type}-panel`).classList.add('active');
       
       // Update form fields based on current method selection
-      if (type === 'image') updateImageFields();
-      else if (type === 'video') updateVideoFields();
-      else if (type === 'audio') updateAudioFields();
-      else if (type === 'document') updateDocumentFields();
+      if (type === 'image') {
+        updateImageFields();
+      } else if (type === 'video') {
+        updateVideoFields();
+      } else if (type === 'audio') {
+        updateAudioFields();
+      } else if (type === 'document') {
+        updateDocumentFields();
+      }
     }
 
     function handleDrop(e, type) {
@@ -1258,8 +1766,16 @@
       if (file) {
         const key = type.replace('sign-', '');
         fileData[key] = file;
-        document.getElementById(`${type}-btn`).disabled = false;
-        const icons = {image:'🖼️', video:'🎬', audio:'🎵', document:'📄', verify:'🔍'};
+        
+        // Enable the appropriate button
+        if (key === 'verify' || key === 'verify-sidecar') {
+          document.getElementById('verify-btn').disabled = false;
+        } else {
+          // Enable sign button for image/video/audio/document
+          document.getElementById(`sign-${key}-btn`).disabled = false;
+        }
+        
+        const icons = {image:'🖼️', video:'🎬', audio:'🎵', document:'📄', verify:'🔍', 'verify-sidecar':'📄'};
         input.previousElementSibling.innerHTML = `<div class="icon">${icons[key]||'📤'}</div><p><strong>${file.name}</strong></p><p>${(file.size/1024).toFixed(1)} KB</p>`;
       }
     }
@@ -1280,15 +1796,26 @@
       const method = document.getElementById(`${type}-method`).value;
       formData.append('method', method);
       
+      // Add userId if logged in (for forensic accountability)
+      const userId = typeof getCurrentUserId === 'function' ? getCurrentUserId() : null;
+      if (userId) {
+        formData.append('userId', userId);
+      }
+      
       if (method === 'human') {
         const creatorName = document.getElementById(`${type}-creator-name`)?.value || '';
         const creatorEmail = document.getElementById(`${type}-creator-email`)?.value || '';
         formData.append('generator', `Human: ${creatorName} <${creatorEmail}>`);
+        // Also pass as signer info
+        formData.append('signerName', creatorName);
+        formData.append('signerEmail', creatorEmail);
       } else if (method === 'mixed') {
         const creatorName = document.getElementById(`${type}-creator-name`)?.value || '';
         const creatorEmail = document.getElementById(`${type}-creator-email`)?.value || '';
         const aiTool = document.getElementById(`${type}-generator`).value || 'Unknown AI Tool';
         formData.append('generator', `AI-Assisted: ${aiTool} by ${creatorName} <${creatorEmail}>`);
+        formData.append('signerName', creatorName);
+        formData.append('signerEmail', creatorEmail);
       } else {
         formData.append('generator', document.getElementById(`${type}-generator`).value || 'elaraSign.web');
       }
@@ -1416,10 +1943,53 @@
       }
     }
 
-    document.addEventListener('DOMContentLoaded', fetchBuildId);
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchBuildId();
+      
+      // Update contact email from firebase-config.js if available
+      if (window.SERVICE_EMAIL) {
+        const contactLink = document.getElementById('contact-email-link');
+        if (contactLink) {
+          contactLink.href = `mailto:${window.SERVICE_EMAIL}`;
+          contactLink.textContent = window.SERVICE_EMAIL;
+        }
+      }
+    });
+
+    // Validate file against sidecar JSON
+    async function validateAgainstSidecar(file, sidecarFile) {
+      try {
+        // Read sidecar JSON
+        const sidecarText = await sidecarFile.text();
+        const sidecarData = JSON.parse(sidecarText);
+        
+        // Validate sidecar structure
+        if (!sidecarData.contentHash || !sidecarData.signatureVersion || !sidecarData.generatedAt) {
+          return { valid: false, error: 'Invalid sidecar format - missing required fields' };
+        }
+        
+        // Compute SHA-256 of the file
+        const fileBuffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', fileBuffer);
+        const fileHash = Array.from(new Uint8Array(hashBuffer))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        
+        // Compare hashes
+        if (fileHash !== sidecarData.contentHash) {
+          return { valid: false, error: 'Content hash mismatch - file has been modified' };
+        }
+        
+        return { valid: true, metadata: sidecarData };
+      } catch (err) {
+        return { valid: false, error: `Sidecar validation error: ${err.message}` };
+      }
+    }
 
     async function verifyFile() {
       const file = fileData.verify;
+      const sidecar = fileData['verify-sidecar'];
+      
       if (!file) {
         return;
       }
@@ -1429,10 +1999,39 @@
       btn.disabled = true;
       btn.textContent = 'Verifying...';
 
-      const formData = new FormData();
-      formData.append('file', file);
-
       try {
+        // If we have a sidecar, perform sidecar validation first
+        if (sidecar) {
+          const sidecarValidation = await validateAgainstSidecar(file, sidecar);
+          if (sidecarValidation.valid) {
+            result.className = 'result show success';
+            result.innerHTML = `
+              <h3><span class="status-badge verified">✅ SIDECAR VALIDATION PASSED</span></h3>
+              <p><strong>Content Hash Match:</strong> ✅ Verified</p>
+              <p><strong>Metadata:</strong> ${sidecarValidation.metadata.generator} (${sidecarValidation.metadata.contentType})</p>
+              <p><strong>Generated:</strong> ${new Date(sidecarValidation.metadata.generatedAt).toLocaleString()}</p>
+              <p><strong>Method:</strong> ${sidecarValidation.metadata.contentType === 'image' ? 'AI Generated' : sidecarValidation.metadata.contentType}</p>
+            `;
+            btn.disabled = false;
+            btn.textContent = 'Verify File';
+            return;
+          } else {
+            result.className = 'result show error';
+            result.innerHTML = `
+              <h3><span class="status-badge tampered">❌ SIDECAR VALIDATION FAILED</span></h3>
+              <p><strong>Reason:</strong> ${sidecarValidation.error}</p>
+              <p>File does not match the sidecar provenance data.</p>
+            `;
+            btn.disabled = false;
+            btn.textContent = 'Verify File';
+            return;
+          }
+        }
+
+        // Fall back to embedded signature verification
+        const formData = new FormData();
+        formData.append('file', file);
+
         const res = await fetch('/api/verify', { method: 'POST', body: formData });
         const data = await res.json();
 
@@ -1461,6 +2060,73 @@
       btn.textContent = 'Verify File';
     }
 
+    // Admin: Decrypt forensic data from signed image
+    async function decryptForensicData() {
+      const file = fileData['admin-decrypt'];
+      
+      if (!file || !currentUser) {
+        return;
+      }
+
+      const btn = document.getElementById('decrypt-btn');
+      const result = document.getElementById('decrypt-result');
+      btn.disabled = true;
+      btn.textContent = 'Decrypting...';
+
+      try {
+        // Get Firebase ID token for authentication
+        const idToken = await currentUser.getIdToken();
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch('/api/admin/decrypt', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'X-User-Email': currentUser.email
+          },
+          body: formData
+        });
+
+        const data = await res.json();
+
+        if (res.status === 401 || res.status === 403) {
+          result.className = 'result show error';
+          result.innerHTML = `<h3>❌ Access Denied</h3><p>${data.message}</p>`;
+        } else if (data.decrypted) {
+          result.className = 'result show success';
+          result.innerHTML = `
+            <h3><span class="status-badge verified">🔓 FORENSIC DATA DECRYPTED</span></h3>
+            <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 8px; margin-top: 12px; font-family: monospace; font-size: 0.9rem;">
+              <p><strong>Timestamp:</strong> ${new Date(data.accountability.timestamp).toLocaleString()}</p>
+              <p><strong>User Fingerprint:</strong> <code>${data.accountability.userFingerprint}</code></p>
+              <p><strong>IP Address:</strong> ${data.accountability.ipAddress}</p>
+              <p><strong>Platform:</strong> ${data.accountability.platform}</p>
+            </div>
+            <p style="margin-top: 12px; font-size: 0.85rem; color: rgba(255,255,255,0.6);">
+              <strong>Match user:</strong> Query your auth system for users where SHA256(user_id).substring(0, 16) === fingerprint
+            </p>
+          `;
+        } else if (data.forensicAvailable === false) {
+          result.className = 'result show warning';
+          result.innerHTML = `<h3><span class="status-badge tampered">⚠️ NO FORENSIC DATA</span></h3><p>Image is signed but contains no forensic accountability data (old signature version).</p>`;
+        } else if (!data.signed) {
+          result.className = 'result show error';
+          result.innerHTML = `<h3><span class="status-badge unsigned">❌ NOT SIGNED</span></h3><p>No elaraSign signature found.</p>`;
+        } else {
+          result.className = 'result show error';
+          result.innerHTML = `<h3>❌ Decryption Failed</h3><p>${data.message}</p>`;
+        }
+      } catch (err) {
+        result.className = 'result show error';
+        result.innerHTML = `<h3>❌ Error</h3><p>${err.message}</p>`;
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Decrypt Forensic Data';
+    }
+
     // Expose functions to global scope for onclick handlers
     // This makes Biome understand these ARE used (via HTML onclick attributes)
     window.showMainTab = showMainTab;
@@ -1473,6 +2139,261 @@
     window.updateAudioFields = updateAudioFields;
     window.updateDocumentFields = updateDocumentFields;
     window.verifyFile = verifyFile;
+    window.decryptForensicData = decryptForensicData;
+
+    // Add event listeners for method selects
+    document.getElementById('image-method').addEventListener('change', updateImageFields);
+    document.getElementById('video-method').addEventListener('change', updateVideoFields);
+    document.getElementById('audio-method').addEventListener('change', updateAudioFields);
+    document.getElementById('document-method').addEventListener('change', updateDocumentFields);
+
+    // Initialize default state
+    updateImageFields();
+  </script>
+
+  <!-- ============================================
+       FIREBASE AUTH
+  ============================================ -->
+  <!-- Firebase SDKs (v9 compat for simpler usage) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <script>
+    // ============================================
+    // FIREBASE INITIALIZATION
+    // ============================================
+    // Config is loaded from firebase-config.js (auto-generated by npm run setup)
+    // If that file doesn't exist, app runs in anonymous-only mode
+    
+    let firebaseInitialized = false;
+    let auth = null;
+    let db = null;
+    let currentUser = null;
+    let isAdmin = false;
+
+    // These will be set by firebase-config.js if it exists
+    // Using window to avoid "unused variable" lint errors
+    window.firebaseConfig = null;
+    window.ADMIN_EMAIL = null;
+
+    // Dynamically load Firebase config
+    async function loadFirebaseConfig() {
+      try {
+        const response = await fetch('firebase-config.js');
+        if (!response.ok) {
+          console.log("ℹ️ firebase-config.js not found - running in anonymous mode");
+          renderAuthUI(null);
+          return;
+        }
+        const configText = await response.text();
+        
+        // Execute the config script to set window.firebaseConfig and window.ADMIN_EMAIL
+        // biome-ignore lint/security/noGlobalEval: Required to load dynamic config
+        eval(configText);
+        
+        if (window.firebaseConfig?.apiKey && !window.firebaseConfig.apiKey.includes("FIREBASE_")) {
+          firebase.initializeApp(window.firebaseConfig);
+          auth = firebase.auth();
+          db = firebase.firestore();
+          firebaseInitialized = true;
+          console.log("🔥 Firebase initialized");
+          auth.onAuthStateChanged(handleAuthStateChange);
+        } else {
+          console.log("ℹ️ Firebase config invalid - running in anonymous mode");
+          renderAuthUI(null);
+        }
+      } catch (error) {
+        console.warn("Firebase config load failed:", error);
+        renderAuthUI(null);
+      }
+    }
+    
+    // Load config on page load
+    loadFirebaseConfig();
+
+    // ============================================
+    // AUTH STATE MANAGEMENT
+    // ============================================
+    async function handleAuthStateChange(user) {
+      currentUser = user;
+      
+      if (user) {
+        // Check if admin (use window.ADMIN_EMAIL set by config)
+        isAdmin = user.email === window.ADMIN_EMAIL;
+        
+        // Create/update user document in Firestore
+        try {
+          await db.collection('users').doc(user.uid).set({
+            email: user.email,
+            displayName: user.displayName || 'Anonymous',
+            photoURL: user.photoURL || null,
+            lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+            isAdmin: isAdmin
+          }, { merge: true });
+        } catch (error) {
+          console.warn("Could not update user document:", error);
+        }
+        
+        console.log(`✅ Signed in as ${user.email}${isAdmin ? ' (ADMIN)' : ''}`);
+      } else {
+        isAdmin = false;
+        console.log("👤 Not signed in");
+      }
+      
+      renderAuthUI(user);
+    }
+
+    // ============================================
+    // AUTH UI RENDERING
+    // ============================================
+    function renderAuthUI(user) {
+      const container = document.getElementById('auth-container');
+      const adminTab = document.getElementById('admin-tab');
+      
+      // Show/hide admin tab
+      if (isAdmin && adminTab) {
+        adminTab.style.display = 'block';
+      } else if (adminTab) {
+        adminTab.style.display = 'none';
+      }
+      
+      if (!firebaseInitialized) {
+        // Firebase not configured - show anonymous mode with sign-in option
+        container.innerHTML = `
+          <div class="auth-user" style="font-size: 0.8rem; color: rgba(255,255,255,0.5);">
+            👤 Anonymous Mode
+          </div>
+          <div style="font-size: 0.7rem; color: rgba(255,255,255,0.3); margin-top: 4px;">
+            Auth not configured
+          </div>
+        `;
+        return;
+      }
+      
+      if (user) {
+        // Signed in - show email/name
+        const adminBadge = isAdmin ? '<span class="auth-user-type admin">⚡ ADMIN</span>' : '';
+        const photo = user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="40" r="20" fill="%2300d4aa"/><ellipse cx="50" cy="85" rx="35" ry="25" fill="%2300d4aa"/></svg>';
+        
+        container.innerHTML = `
+          <div class="auth-user">
+            <img src="${photo}" alt="Profile" referrerpolicy="no-referrer" style="width: 28px; height: 28px; border-radius: 50%; margin-right: 8px;">
+            <div class="auth-user-info">
+              <span class="auth-user-email" style="font-size: 0.8rem; color: #00d4aa;">${user.email}</span>
+              ${adminBadge}
+            </div>
+          </div>
+          <button class="auth-btn signout" onclick="signOut()" style="margin-top: 6px; font-size: 0.7rem; padding: 4px 10px;">Sign Out</button>
+        `;
+      } else {
+        // Not signed in - show Anonymous Mode + Sign In button
+        container.innerHTML = `
+          <div class="auth-user" style="font-size: 0.8rem; color: rgba(255,255,255,0.5);">
+            👤 Anonymous Mode
+          </div>
+          <button class="auth-btn google" onclick="signInWithGoogle()" style="margin-top: 8px; font-size: 0.75rem; padding: 6px 12px; display: flex; align-items: center; gap: 6px; background: #4285f4; border: none; border-radius: 4px; color: white; cursor: pointer;">
+            <svg width="14" height="14" viewBox="0 0 24 24"><path fill="white" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="white" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="white" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="white" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Sign in with Google
+          </button>
+        `;
+      }
+    }
+
+    // ============================================
+    // LOGIN MODAL
+    // ============================================
+    function showLoginModal() {
+      if (!firebaseInitialized) {
+        alert("Authentication is not configured for this deployment.\\n\\nThis elaraSign instance runs in anonymous-only mode.");
+        return;
+      }
+      document.getElementById('login-modal').classList.add('show');
+      document.getElementById('admin-error').textContent = '';
+    }
+
+    function closeLoginModal() {
+      document.getElementById('login-modal').classList.remove('show');
+      document.getElementById('admin-error').textContent = '';
+    }
+
+    // ============================================
+    // SIGN IN METHODS
+    // ============================================
+    async function signInWithGoogle() {
+      if (!firebaseInitialized) { return; }
+      
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await auth.signInWithPopup(provider);
+        closeLoginModal();
+      } catch (error) {
+        console.error("Google sign-in failed:", error);
+        alert(`Sign-in failed: ${error.message}`);
+      }
+    }
+
+    async function signInAdmin() {
+      if (!firebaseInitialized) { return; }
+      
+      const email = document.getElementById('admin-email').value;
+      const password = document.getElementById('admin-password').value;
+      const errorEl = document.getElementById('admin-error');
+      
+      if (!email || !password) {
+        errorEl.textContent = "Email and password required";
+        return;
+      }
+      
+      // Check if email matches admin (from config)
+      if (email !== window.ADMIN_EMAIL) {
+        errorEl.textContent = "Invalid admin credentials";
+        return;
+      }
+      
+      try {
+        await auth.signInWithEmailAndPassword(email, password);
+        closeLoginModal();
+      } catch (error) {
+        console.error("Admin sign-in failed:", error);
+        errorEl.textContent = "Invalid credentials";
+      }
+    }
+
+    async function signOut() {
+      if (!firebaseInitialized) { return; }
+      
+      try {
+        await auth.signOut();
+      } catch (error) {
+        console.error("Sign-out failed:", error);
+      }
+    }
+
+    // ============================================
+    // GET CURRENT USER ID FOR SIGNING
+    // ============================================
+    // This function is called by signContent() to get userId
+    function getCurrentUserId() {
+      if (currentUser) {
+        return currentUser.uid;
+      }
+      return null; // Will use anonymous mode with timestamp
+    }
+
+    // Expose auth functions to global scope
+    window.showLoginModal = showLoginModal;
+    window.closeLoginModal = closeLoginModal;
+    window.toggleAdminLogin = toggleAdminLogin;
+    window.signInWithGoogle = signInWithGoogle;
+    window.signInAdmin = signInAdmin;
+    window.signOut = signOut;
+    window.getCurrentUserId = getCurrentUserId;
+
+    // Close modal on background click
+    document.getElementById('login-modal')?.addEventListener('click', function(e) {
+      if (e.target === this) { closeLoginModal(); }
+    });
   </script>
 </body>
 </html>

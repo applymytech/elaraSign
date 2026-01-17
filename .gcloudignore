@@ -1,0 +1,74 @@
+# .gcloudignore - Controls what gets uploaded to Cloud Build
+# ============================================================
+#
+# IMPORTANT: This is DIFFERENT from .gitignore!
+#
+# - .gitignore protects YOUR secrets from going to GitHub
+# - .gcloudignore controls what goes to Cloud Build for deployment
+#
+# Files like firebase-config.js are:
+#   - gitignored (your secrets don't go to public repo)
+#   - NOT gcloudignored (your secrets DO go to YOUR Cloud Build)
+#
+# When a new user:
+#   1. Clones repo (no secrets - protected by .gitignore)
+#   2. Runs setup (creates THEIR secrets locally)
+#   3. Runs deploy (THEIR secrets uploaded to THEIR Cloud Build)
+#
+# ============================================================
+
+# NOTE: We control .gcloudignore manually (not using !include:.gitignore)
+# This gives us precise control over what goes to Cloud Build.
+
+# ============================================================
+# EXCLUDE: Things that should NOT go to Cloud Build
+# ============================================================
+
+# Dependencies (Cloud Build runs npm install)
+node_modules/
+
+# Git
+.git/
+.github/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test files
+test-files/
+test-output/
+coverage/
+
+# Dev docs
+devdocs/
+
+# Local state files
+.preflight-passed
+.preview-revision
+.last-live-revision
+
+# Source certificates (secrets are in GCP Secret Manager)
+certs/service.p12
+certs/service.password
+
+# ============================================================
+# EXPLICITLY INCLUDE: Secrets needed for deployment
+# (These are gitignored but MUST go to Cloud Build)
+# ============================================================
+
+# Firebase config - MUST be deployed (created by setup.ts)
+!web/firebase-config.js
+
+# Deploy config - MUST be deployed (has runtime settings)
+!deploy.config.json
+
+# Firestore rules - MUST be deployed
+!firestore.rules

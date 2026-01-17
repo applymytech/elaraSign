@@ -4,7 +4,7 @@
 # ============================================================================
 # Stage 1: Build
 # ============================================================================
-FROM node:22-slim AS builder
+FROM node:24-slim AS builder
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ RUN npx tsx scripts/generate-build.ts production
 # ============================================================================
 # Stage 2: Production
 # ============================================================================
-FROM node:22-slim AS production
+FROM node:24-slim AS production
 
 # Install security updates
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*

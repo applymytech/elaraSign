@@ -11,7 +11,7 @@
  *
  * THREE LAYERS OF IDENTITY:
  * 1. SERVICE: Who witnessed (this module - certificate from Secret Manager)
- * 2. DEPLOY: When the witness was deployed (git commit, revision)
+ * 2. DEPLOY: When the witness was deployed
  * 3. SIGNER: Who requested the signature (from request body)
  *
  * CERTIFICATE STORAGE (production):
@@ -58,9 +58,6 @@ export interface ServiceIdentityConfig {
 export interface DeployInstanceInfo {
 	/** When this instance was deployed */
 	deployedAt: string;
-
-	/** Git commit hash (if available) */
-	gitCommit?: string;
 
 	/** Cloud Run revision (if on Cloud Run) */
 	cloudRunRevision?: string;
@@ -147,7 +144,6 @@ export async function initServiceIdentity(): Promise<ServiceIdentity> {
 	console.log(`   Service: ${config.serviceName} @ ${config.serviceUrl}`);
 	console.log(`   Location: ${deploy.region.displayName}`);
 	console.log(`   Deploy: ${deploy.deployedAt}`);
-	console.log(`   Git: ${deploy.gitCommit || "unknown"}`);
 	console.log(`   PKCS#7 Signing: ${_serviceIdentity.canSignPkcs7 ? "✅ Enabled" : "⚠️ Metadata-only"}`);
 
 	return _serviceIdentity;
@@ -226,21 +222,11 @@ function captureDeployInfo(): DeployInstanceInfo {
 
 	return {
 		deployedAt: new Date().toISOString(),
-		gitCommit: process.env.GIT_COMMIT || process.env.K_REVISION?.split("-").pop() || tryGetGitCommit(),
 		cloudRunRevision: process.env.K_REVISION,
 		nodeVersion: process.version,
 		serviceVersion,
 		region,
 	};
-}
-
-function tryGetGitCommit(): string | undefined {
-	try {
-		const { execSync } = require("node:child_process");
-		return execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
-	} catch {
-		return undefined;
-	}
 }
 
 // ============================================================================
@@ -260,11 +246,28 @@ async function loadOrGenerateCertificate(
 		return { p12Certificate, p12Password, certificateFingerprint };
 	}
 
-	// 2. Try local file (development)
-	const localCertPath = path.resolve(__dirname, "../../../certs/service.p12");
-	const localPasswordPath = path.resolve(__dirname, "../../../certs/service.password");
+	// 2. Try local file (development) - try multiple possible locations
+	const possibleCertPaths = [
+		path.join(process.cwd(), "certs", "service.p12"), // From project root
+		path.resolve(__dirname, "../../../certs/service.p12"), // From src/core
+		path.resolve(__dirname, "../../certs/service.p12"), // From src
+		path.join(__dirname, "..", "..", "..", "certs", "service.p12"), // Alternative
+		"certs/service.p12", // Relative to cwd
+	];
 
-	if (fs.existsSync(localCertPath) && fs.existsSync(localPasswordPath)) {
+	let localCertPath: string | null = null;
+	let localPasswordPath: string | null = null;
+
+	for (const certPath of possibleCertPaths) {
+		const passPath = certPath.replace("service.p12", "service.password");
+		if (fs.existsSync(certPath) && fs.existsSync(passPath)) {
+			localCertPath = certPath;
+			localPasswordPath = passPath;
+			break;
+		}
+	}
+
+	if (localCertPath && localPasswordPath) {
 		console.log("📜 Loading P12 certificate from local file");
 		const p12Certificate = fs.readFileSync(localCertPath);
 		const p12Password = fs.readFileSync(localPasswordPath, "utf-8").trim();
@@ -276,7 +279,10 @@ async function loadOrGenerateCertificate(
 	// 3. Auto-generate for development (optional)
 	if (process.env.ELARASIGN_AUTO_GENERATE_CERT === "true") {
 		console.log("📜 Auto-generating self-signed P12 certificate for development");
-		return await generateAndSaveCertificate(config, localCertPath, localPasswordPath);
+		// Use default paths for auto-generation
+		const defaultCertPath = path.join(process.cwd(), "certs", "service.p12");
+		const defaultPasswordPath = path.join(process.cwd(), "certs", "service.password");
+		return await generateAndSaveCertificate(config, defaultCertPath, defaultPasswordPath);
 	}
 
 	// 4. No certificate available - metadata-only signing

@@ -1,58 +1,67 @@
 /**
- * ElaraSign Standard v2.0
+ * ElaraSign Standard v3.0
  * ========================
  * Platform-agnostic content signing module with multi-location redundancy.
  * Works in both Node.js (Desktop) and Browser (Cloud).
  *
- * v2.0 IMPROVEMENTS:
- * - 3 signature locations for crop resilience (top-left, top-right, bottom-center)
- * - Compact signature (48 bytes) fits in smaller blocks
+ * v3.0 IMPROVEMENTS (January 2026 - Post Sha1-Hulud Security Hardening):
+ * - 5 signature locations for maximum crop resilience (4 corners + center)
+ * - FULL SHA-256 hashes (32 bytes each) - NO TRUNCATION for legal verifiability
+ * - 8-byte timestamp (fixes Year 2038 problem, good until year 292 billion)
  * - Any single location can verify authenticity
- * - Survives common social media cropping
+ * - Survives aggressive social media cropping
+ *
+ * INTEGRITY PHILOSOPHY:
+ * - NO truncation of cryptographic hashes - incomplete data leads to incomplete truth
+ * - For legal/forensic purposes, signatures must be 100% verifiable
+ * - Honest failures over silent fallbacks
  *
  * DO NOT import platform-specific APIs (fs, canvas, etc.)
  * All functions work with raw Uint8ClampedArray pixel data.
  *
  * @author OpenElara Project
  * @license MIT
- * @version 2.0.0
+ * @version 3.0.0
  */
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-/** Signature marker identifying Elara-signed content (v2) */
-export const ELARA_MARKER = "ELARA2"; // 6 bytes (shorter for compact sig)
+/** Signature marker identifying Elara-signed content (v3) */
+export const ELARA_MARKER = "ELARA3"; // 6 bytes
 
 /** Current signing standard version */
-export const ELARA_VERSION = 0x02;
+export const ELARA_VERSION = 0x03;
 
 /**
- * MULTI-LOCATION SIGNATURE BLOCKS
- * ================================
- * Three locations for redundancy. Troll must crop ALL THREE to remove signature.
+ * MULTI-LOCATION SIGNATURE BLOCKS (v3.0 - 5 locations)
+ * =====================================================
+ * FIVE locations for maximum redundancy. Attacker must crop ALL FIVE to remove signature.
+ * Even aggressive cropping (corners AND center) leaves at least one location intact.
  *
  * Layout visualization (not to scale):
  *
  *   ┌──────┐─────────────────────────────┌──────┐
  *   │ LOC1 │                             │ LOC2 │
- *   │32x4  │                             │ 4x32 │
+ *   │48x4  │                             │ 4x48 │
  *   └──────┘                             │      │
  *   │                                    │      │
- *   │              IMAGE                 └──────┘
- *   │
- *   │
- *   ├────────────────┌──────┐───────────────────┤
- *   │                │ LOC3 │                   │
- *   └────────────────│32x4  │───────────────────┘
- *                    └──────┘
+ *   │           ┌──────┐                 └──────┘
+ *   │           │ LOC5 │ (CENTER)
+ *   │           │48x4  │
+ *   │           └──────┘
+ *   │                                    ┌──────┐
+ *   ├──────┐                             │ LOC4 │
+ *   │ LOC3 │                             │ 4x48 │
+ *   │48x4  │────────────────────────────-└──────┘
+ *   └──────┘
  */
 export const SIGNATURE_LOCATIONS = {
 	/** Top-left horizontal block */
 	topLeft: {
 		name: "top-left",
-		width: 32,
+		width: 48,
 		height: 4,
 		getPosition: (_imgWidth: number, _imgHeight: number) => ({ x: 0, y: 0 }),
 	},
@@ -60,51 +69,66 @@ export const SIGNATURE_LOCATIONS = {
 	topRight: {
 		name: "top-right",
 		width: 4,
-		height: 32,
+		height: 48,
 		getPosition: (imgWidth: number, _imgHeight: number) => ({ x: imgWidth - 4, y: 0 }),
 	},
-	/** Bottom-center horizontal block */
-	bottomCenter: {
-		name: "bottom-center",
-		width: 32,
+	/** Bottom-left horizontal block */
+	bottomLeft: {
+		name: "bottom-left",
+		width: 48,
+		height: 4,
+		getPosition: (_imgWidth: number, imgHeight: number) => ({ x: 0, y: imgHeight - 4 }),
+	},
+	/** Bottom-right vertical block */
+	bottomRight: {
+		name: "bottom-right",
+		width: 4,
+		height: 48,
+		getPosition: (imgWidth: number, imgHeight: number) => ({ x: imgWidth - 4, y: imgHeight - 48 }),
+	},
+	/** Center horizontal block - the "hidden in plain sight" signature */
+	center: {
+		name: "center",
+		width: 48,
 		height: 4,
 		getPosition: (imgWidth: number, imgHeight: number) => ({
-			x: Math.floor((imgWidth - 32) / 2),
-			y: imgHeight - 4,
+			x: Math.floor((imgWidth - 48) / 2),
+			y: Math.floor((imgHeight - 4) / 2),
 		}),
 	},
 } as const;
 
-/** Minimum image size to support all signature locations */
+/** Minimum image size to support all 5 signature locations */
 export const MIN_IMAGE_SIZE = {
-	width: 64, // Need space for bottom-center (32px) + margins
-	height: 36, // Need space for top-right (32px) + bottom (4px)
+	width: 96, // Need space for center (48px) + margins
+	height: 96, // Need space for vertical blocks (48px) + margins
 } as const;
 
 /**
- * Compact signature layout (48 bytes total)
- * Fits in 32x4 = 128 pixels, using 4 bits per pixel = 64 bytes capacity
+ * Full-integrity signature layout (84 bytes total)
+ * NO TRUNCATION - full SHA-256 hashes for legal verifiability
+ * Fits in 48x4 = 192 pixels, using 4 bits per pixel = 96 bytes capacity
  */
 export const SIGNATURE_LAYOUT = {
-	marker: 6, // "ELARA2"
-	version: 1, // 0x02
-	locationId: 1, // Which location this is (0, 1, 2)
-	metaHash: 16, // First 16 bytes of SHA-256
-	contentHash: 16, // First 16 bytes of SHA-256
-	timestamp: 4, // Unix timestamp (seconds, 4 bytes)
-	checksum: 4, // CRC-32 for better integrity
-	total: 48, // bytes total
+	marker: 6, // "ELARA3"
+	version: 1, // 0x03
+	locationId: 1, // Which location this is (0-4)
+	metaHash: 32, // FULL SHA-256 (no truncation)
+	contentHash: 32, // FULL SHA-256 (no truncation)
+	timestamp: 8, // 64-bit timestamp (fixes Year 2038, good until year 292 billion)
+	checksum: 4, // CRC-32 for integrity verification
+	total: 84, // bytes total
 } as const;
 
 /** Capacity of each signature block (nibble-based: 4 bits per pixel) */
-export const BLOCK_CAPACITY = 64; // 32*4 pixels * 4 bits / 8 = 64 bytes
+export const BLOCK_CAPACITY = 96; // 48*4 pixels * 4 bits / 8 = 96 bytes (12 bytes margin)
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 /**
- * Elara Content Metadata Schema v2.0
+ * Elara Content Metadata Schema v3.0
  * CANONICAL - Both Desktop and Cloud use this exact schema
  */
 export interface ElaraContentMetadata {
@@ -113,7 +137,7 @@ export interface ElaraContentMetadata {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	/** Elara signing standard version */
-	signatureVersion: "2.0";
+	signatureVersion: "3.0";
 
 	/** Generator app identifier */
 	generator: "elara.desktop" | "elara.cloud" | string;
@@ -178,14 +202,19 @@ export interface ElaraContentMetadata {
 
 	/** Creator name/contact (for user-signed content) */
 	creatorInfo?: string;
+
+	/** Service deployment timestamp for build-specific accountability */
+	serviceDeployedAt?: string;
 }
 
-/** Location identifiers for multi-location signing */
-export type SignatureLocationId = 0 | 1 | 2;
+/** Location identifiers for multi-location signing (5 locations in v3.0) */
+export type SignatureLocationId = 0 | 1 | 2 | 3 | 4;
 export const LOCATION_IDS = {
 	topLeft: 0 as SignatureLocationId,
 	topRight: 1 as SignatureLocationId,
-	bottomCenter: 2 as SignatureLocationId,
+	bottomLeft: 2 as SignatureLocationId,
+	bottomRight: 3 as SignatureLocationId,
+	center: 4 as SignatureLocationId,
 } as const;
 
 /**
@@ -300,55 +329,53 @@ export async function sha256Bytes(data: string | Uint8Array, bytes = 32): Promis
 }
 
 // ============================================================================
-// SIGNATURE PACKING (Compact v2.0 format)
+// SIGNATURE PACKING (Full-Integrity v3.0 format)
 // ============================================================================
 
 /**
  * Pack signature for a specific location
  *
- * Layout (48 bytes):
- * [MARKER: 6][VERSION: 1][LOCATION: 1][META_HASH: 16][CONTENT_HASH: 16][TIMESTAMP: 4][CRC32: 4]
+ * Layout (84 bytes) - NO TRUNCATION:
+ * [MARKER: 6][VERSION: 1][LOCATION: 1][META_HASH: 32][CONTENT_HASH: 32][TIMESTAMP: 8][CRC32: 4]
  */
 export async function packSignatureForLocation(
 	metadataJson: string,
 	contentBytes: Uint8Array,
 	locationId: SignatureLocationId,
 ): Promise<PackedSignature> {
-	// Calculate hashes (truncated to 16 bytes for compact storage)
-	const metaHash = await sha256Bytes(metadataJson, 16);
-	const contentHash = await sha256Bytes(contentBytes, 16);
-	const timestamp = Math.floor(Date.now() / 1000); // Unix seconds
+	// Calculate FULL hashes - NO truncation for legal verifiability
+	const metaHash = await sha256Bytes(metadataJson, 32);
+	const contentHash = await sha256Bytes(contentBytes, 32);
+	const timestamp = BigInt(Date.now()); // Milliseconds as 64-bit for precision
 
-	// Create buffer for signature (48 bytes)
+	// Create buffer for signature (84 bytes)
 	const signature = new Uint8Array(SIGNATURE_LAYOUT.total);
 	let offset = 0;
 
-	// 1. Marker (6 bytes): "ELARA2"
+	// 1. Marker (6 bytes): "ELARA3"
 	const markerBytes = new TextEncoder().encode(ELARA_MARKER);
 	signature.set(markerBytes, offset);
 	offset += SIGNATURE_LAYOUT.marker;
 
-	// 2. Version (1 byte): 0x02
+	// 2. Version (1 byte): 0x03
 	signature[offset] = ELARA_VERSION;
 	offset += SIGNATURE_LAYOUT.version;
 
-	// 3. Location ID (1 byte): 0, 1, or 2
+	// 3. Location ID (1 byte): 0-4
 	signature[offset] = locationId;
 	offset += SIGNATURE_LAYOUT.locationId;
 
-	// 4. Metadata hash (16 bytes)
+	// 4. Metadata hash (32 bytes) - FULL SHA-256
 	signature.set(metaHash, offset);
 	offset += SIGNATURE_LAYOUT.metaHash;
 
-	// 5. Content hash (16 bytes)
+	// 5. Content hash (32 bytes) - FULL SHA-256
 	signature.set(contentHash, offset);
 	offset += SIGNATURE_LAYOUT.contentHash;
 
-	// 6. Timestamp (4 bytes, big-endian)
-	signature[offset] = (timestamp >> 24) & 0xff;
-	signature[offset + 1] = (timestamp >> 16) & 0xff;
-	signature[offset + 2] = (timestamp >> 8) & 0xff;
-	signature[offset + 3] = timestamp & 0xff;
+	// 6. Timestamp (8 bytes, big-endian) - 64-bit milliseconds
+	const timestampView = new DataView(signature.buffer, offset, 8);
+	timestampView.setBigUint64(0, timestamp, false); // big-endian
 	offset += SIGNATURE_LAYOUT.timestamp;
 
 	// 7. CRC-32 checksum (4 bytes) - of everything above
@@ -364,7 +391,7 @@ export async function packSignatureForLocation(
 		locationId,
 		metaHash: arrayToHex(metaHash),
 		contentHash: arrayToHex(contentHash),
-		timestamp,
+		timestamp: Number(timestamp),
 	};
 }
 
@@ -414,13 +441,10 @@ export function unpackSignature(signature: Uint8Array): {
 	const contentHash = signature.slice(offset, offset + SIGNATURE_LAYOUT.contentHash);
 	offset += SIGNATURE_LAYOUT.contentHash;
 
-	// 6. Extract timestamp (use >>> 0 to ensure unsigned 32-bit)
-	const timestamp =
-		((signature[offset] << 24) |
-			(signature[offset + 1] << 16) |
-			(signature[offset + 2] << 8) |
-			signature[offset + 3]) >>>
-		0;
+	// 6. Extract timestamp (64-bit big-endian milliseconds)
+	const timestampView = new DataView(signature.buffer, signature.byteOffset + offset, 8);
+	const timestampBigInt = timestampView.getBigUint64(0, false); // big-endian
+	const timestamp = Number(timestampBigInt);
 	offset += SIGNATURE_LAYOUT.timestamp;
 
 	// 7. Extract and verify checksum (use >>> 0 to ensure unsigned)
@@ -577,7 +601,7 @@ function extractFromLocation(
 }
 
 /**
- * Embed Elara signatures at ALL THREE locations for redundancy
+ * Embed Elara signatures at ALL FIVE locations for maximum redundancy
  */
 export async function embedMultiLocationSignature(
 	imageData: Uint8ClampedArray,
@@ -602,11 +626,13 @@ export async function embedMultiLocationSignature(
 	let metaHash = "";
 	let contentHash = "";
 
-	// Embed at each location
+	// Embed at all 5 locations for maximum crop resistance
 	const locations = [
 		{ loc: SIGNATURE_LOCATIONS.topLeft, id: LOCATION_IDS.topLeft },
 		{ loc: SIGNATURE_LOCATIONS.topRight, id: LOCATION_IDS.topRight },
-		{ loc: SIGNATURE_LOCATIONS.bottomCenter, id: LOCATION_IDS.bottomCenter },
+		{ loc: SIGNATURE_LOCATIONS.bottomLeft, id: LOCATION_IDS.bottomLeft },
+		{ loc: SIGNATURE_LOCATIONS.bottomRight, id: LOCATION_IDS.bottomRight },
+		{ loc: SIGNATURE_LOCATIONS.center, id: LOCATION_IDS.center },
 	];
 
 	for (const { loc, id } of locations) {
@@ -635,7 +661,7 @@ export async function embedMultiLocationSignature(
 }
 
 /**
- * Extract and verify signatures from ALL locations
+ * Extract and verify signatures from ALL FIVE locations
  * Returns valid if ANY location has valid signature (redundancy)
  */
 export function extractMultiLocationSignature(
@@ -655,7 +681,9 @@ export function extractMultiLocationSignature(
 	const locations = [
 		{ loc: SIGNATURE_LOCATIONS.topLeft, name: "top-left" },
 		{ loc: SIGNATURE_LOCATIONS.topRight, name: "top-right" },
-		{ loc: SIGNATURE_LOCATIONS.bottomCenter, name: "bottom-center" },
+		{ loc: SIGNATURE_LOCATIONS.bottomLeft, name: "bottom-left" },
+		{ loc: SIGNATURE_LOCATIONS.bottomRight, name: "bottom-right" },
+		{ loc: SIGNATURE_LOCATIONS.center, name: "center" },
 	];
 
 	for (const { loc, name } of locations) {
@@ -836,7 +864,7 @@ export function createMetadata(params: {
 	promptHash: string;
 }): ElaraContentMetadata {
 	return {
-		signatureVersion: "2.0",
+		signatureVersion: "3.0",
 		generator: params.generator,
 		generatedAt: new Date().toISOString(),
 		userFingerprint: params.userFingerprint,

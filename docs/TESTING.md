@@ -87,7 +87,7 @@ npx tsx src/testing/test-runner.ts --help
 | Layer | Name | Survives JPEG? | Purpose |
 |-------|------|----------------|---------|
 | 1 | Billboard | No | EXIF/IPTC/XMP, PNG tEXt - visible in Windows Properties |
-| 2 | DNA | No | LSB steganography - 3 locations, crop-resilient |
+| 2 | DNA | No | LSB steganography - 5 locations, maximum crop-resilience |
 | 3 | Spread Spectrum | **YES** | DCT frequency domain - survives screenshots, social media |
 | 4 | Forensic | No | AES-256 encrypted - only operator can decrypt |
 

@@ -12,10 +12,13 @@
  * to decrypt accountability data embedded in signed images.
  */
 
+import crypto from "node:crypto";
 import { Router } from "express";
 import multer from "multer";
 import sharp from "sharp";
+import { verifyAudio } from "../../core/audio-signing.js";
 import { decryptAccountability, isValidMasterKey } from "../../core/forensic-crypto.js";
+import { verifyPdf } from "../../core/pdf-signing.js";
 import { hasElaraSignature, readSignature, verifyImageContent } from "../../core/signing-core.js";
 import { extractSpreadSpectrum } from "../../core/spread-spectrum.js";
 import {
@@ -23,7 +26,7 @@ import {
 	extractJpegElaraMetadata,
 	extractPngElaraMetadata,
 } from "../../core/standard-metadata.js";
-import { extractForensicPayload, verifyPdfSignature } from "./sign.js";
+import { extractForensicPayload } from "./sign.js";
 
 const router = Router();
 
@@ -39,6 +42,20 @@ const ALLOWED_TYPES = [
 	"image/bmp",
 	"image/tiff",
 	"application/pdf",
+	// Audio formats
+	"audio/mpeg", // MP3
+	"audio/wav", // WAV
+	"audio/x-wav", // WAV (alternative)
+	"audio/wave", // WAV (alternative)
+	"audio/flac", // FLAC
+	"audio/ogg", // OGG
+	"audio/mp4", // M4A
+	"audio/x-m4a", // M4A (alternative)
+	// Video formats
+	"video/mp4", // MP4
+	"video/webm", // WebM
+	"video/x-matroska", // MKV
+	"video/quicktime", // MOV
 ];
 
 const upload = multer({
@@ -63,9 +80,9 @@ router.post("/verify", upload.single("file"), async (req, res) => {
 
 		// Handle PDF
 		if (mimetype === "application/pdf") {
-			const pdfResult = verifyPdfSignature(buffer);
+			const pdfResult = await verifyPdf(new Uint8Array(buffer));
 
-			if (!pdfResult.signed) {
+			if (!pdfResult.isSigned) {
 				return res.json({
 					type: "pdf",
 					signed: false,
@@ -78,12 +95,54 @@ router.post("/verify", upload.single("file"), async (req, res) => {
 				signed: true,
 				verified: true, // PDF signatures are verified by presence (no pixel content hash)
 				signature: {
-					version: pdfResult.version,
-					metaHash: pdfResult.metaHash,
-					generator: pdfResult.generator,
-					timestamp: pdfResult.timestamp,
+					version: "2.0",
+					metaHash: pdfResult.signatureHash,
+					generator: pdfResult.metadata?.generator,
+					timestamp: pdfResult.metadata?.generatedAt,
+					contentHash: pdfResult.contentHash,
 				},
 				message: "elaraSign signature found in PDF",
+			});
+		}
+
+		// Handle audio files
+		if (mimetype.startsWith("audio/")) {
+			const audioResult = await verifyAudio(new Uint8Array(buffer));
+
+			if (!audioResult.isSigned) {
+				return res.json({
+					type: "audio",
+					signed: false,
+					message: "No elaraSign signature detected in audio file",
+				});
+			}
+
+			// Compute content hash for consistency with signing
+			const contentHash = crypto.createHash("sha256").update(buffer).digest("hex");
+
+			return res.json({
+				type: "audio",
+				signed: true,
+				verified: true,
+				signature: {
+					version: "2.0",
+					metaHash: audioResult.signatureHash,
+					generator: audioResult.metadata?.generator,
+					timestamp: audioResult.metadata?.generatedAt,
+					contentHash: contentHash,
+				},
+				message: "elaraSign signature found in audio file",
+			});
+		}
+
+		// Handle video files (sidecar-based verification)
+		if (mimetype.startsWith("video/")) {
+			// For videos, we need the sidecar file to verify
+			// For now, just check if it looks like it might be signed
+			return res.json({
+				type: "video",
+				signed: false, // Videos require sidecar verification
+				message: "Video verification requires sidecar JSON file. Use the sidecar validation feature.",
 			});
 		}
 

@@ -12,8 +12,9 @@ elaraSign uses a **4-layer defense** to ensure provenance data survives various 
 │  │ • Visible in Windows Properties, Adobe, ExifTool          │  │
 │  │ • Easily stripped - marketing/trust signal only           │  │
 │  ├───────────────────────────────────────────────────────────┤  │
-│  │ Layer 2: DNA (LSB Steganography)                          │  │
-│  │ • Hidden in LSB of blue channel, 3 locations              │  │
+│  │ Layer 2: DNA (LSB Steganography) - v3.0                   │  │
+│  │ • Hidden in LSB of blue channel, 5 locations              │  │
+│  │ • Full SHA-256 hashes (no truncation)                     │  │
 │  │ • Survives lossless operations only                       │  │
 │  ├───────────────────────────────────────────────────────────┤  │
 │  │ Layer 3: THE SPREAD (DCT Spread Spectrum)                 │  │
@@ -64,19 +65,20 @@ elaraSign uses a **4-layer defense** to ensure provenance data survives various 
 
 **Technique**: Least Significant Bit embedding in blue channel
 
-**Location**: 3 redundant positions (top-left, top-right, bottom-center)
+**Location**: 5 redundant positions (top-left, top-right, bottom-left, bottom-right, center)
 
 **Contains**:
-- 48-byte compact signature
-- Content hash
-- Metadata hash
-- Timestamp
+- 84-byte full-integrity signature (v3.0)
+- FULL SHA-256 content hash (32 bytes - NO truncation)
+- FULL SHA-256 metadata hash (32 bytes - NO truncation)
+- 64-bit millisecond timestamp (future-proof until year 292 billion)
 
 **Survivability**:
 | Operation | Survives? |
 |-----------|-----------|
 | Lossless PNG operations | ✅ Yes |
-| Mild cropping (1 location survives) | ✅ Yes |
+| Mild cropping (≤4 locations) | ✅ Yes |
+| Aggressive cropping | ✅ Center often survives |
 | JPEG compression | ❌ Degrades |
 | Screenshots | ❌ No |
 | Any lossy operation | ❌ No |

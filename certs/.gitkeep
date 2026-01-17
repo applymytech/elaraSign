@@ -1,0 +1,25 @@
+# elaraSign Certificates Directory
+# =================================
+#
+# ⚠️  THIS FOLDER SHOULD ALWAYS BE EMPTY  ⚠️
+#
+# ALL secrets exist ONLY in GCP Secret Manager:
+#   - elarasign-master-key       (forensic decryption)
+#   - elarasign-p12-certificate  (signing certificate)
+#   - elarasign-p12-password     (certificate password)
+#
+# The setup script (npm run setup):
+#   1. Generates secrets
+#   2. Uploads to GCP Secret Manager
+#   3. DELETES local copies
+#
+# This is intentional security - no secrets ever persist locally.
+#
+# For LOCAL DEVELOPMENT:
+#   - Use Firebase emulators: firebase emulators:start
+#   - App auto-generates temp certs when ELARASIGN_AUTO_GENERATE_CERT=true
+#   - Or fetch secrets: gcloud secrets versions access latest --secret=NAME
+#
+# For PRODUCTION (Cloud Run):
+#   - Secrets injected via --set-secrets in cloudbuild.yaml
+#   - No files needed - all from environment variables

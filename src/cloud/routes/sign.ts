@@ -10,7 +10,7 @@
  *    - Easy to strip but provides trust signal to legitimate users
  *
  * 2. "DNA" (Internal) - LSB steganographic embedding via signing-core.ts
- *    - Hidden in LSB blue channel, 3 locations, crop-resilient
+ *    - Hidden in LSB blue channel, 5 locations, maximum crop-resilience
  *    - Survives lossless operations only
  *    - Our sovereign proof that only Elara tools can fully verify
  *
@@ -287,8 +287,17 @@ async function buildMetadata(
 		creatorInfo = creatorInfo ? `${creatorInfo} <${options.creatorEmail}>` : options.creatorEmail;
 	}
 
+	// Get service deployment timestamp for uniqueness and accountability
+	let serviceDeployedAt: string | undefined;
+	try {
+		const identity = getServiceIdentity();
+		serviceDeployedAt = identity.deploy.deployedAt;
+	} catch {
+		serviceDeployedAt = undefined;
+	}
+
 	return {
-		signatureVersion: "2.0",
+		signatureVersion: "3.0",
 		generator: options.generator || "elara.sign.cloud",
 		generatedAt: new Date().toISOString(),
 		userFingerprint,
@@ -301,6 +310,8 @@ async function buildMetadata(
 		seed: options.seed,
 		// Store creator info in a custom field (will be hashed into signature)
 		creatorInfo: creatorInfo || undefined,
+		// Include service deployment timestamp for build-specific uniqueness
+		serviceDeployedAt,
 	};
 }
 
@@ -428,9 +439,15 @@ router.post("/sign", handleUpload, async (req, res) => {
 			creatorDisplay = `${req.body.creatorName}`;
 		}
 
+		// Include service deployment timestamp in generator for accountability
+		const deployTimestamp = metadata.serviceDeployedAt
+			? ` (deployed ${new Date(metadata.serviceDeployedAt).toISOString()})`
+			: "";
+		const fullGenerator = `${metadata.generator}${deployTimestamp}`;
+
 		// Standard metadata options for the "Passport" layer (visible in Windows Properties, etc.)
 		const standardMetaOptions: StandardMetadataOptions = {
-			generator: metadata.generator,
+			generator: fullGenerator,
 			model: metadata.modelUsed,
 			generationMethod: generationMethod,
 			timestamp: new Date().toISOString(),

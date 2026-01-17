@@ -25,9 +25,6 @@ src/local
 # Documentation
 docs
 
-# Independent checker tools (not part of elaraSign service)
-checkers
-
 # Deployment scripts (not needed in container, but scripts/ needed for build)
 deploy.ps1
 deploy-safe.ps1
